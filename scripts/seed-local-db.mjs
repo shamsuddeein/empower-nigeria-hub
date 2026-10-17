@@ -1,9 +1,12 @@
 import { createClient } from "@libsql/client";
 
-const client = createClient({ url: "file:local.db" });
+const url = process.env.TURSO_DATABASE_URL || "file:local.db";
+const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
+
+const client = createClient({ url, ...(authToken ? { authToken } : {}) });
 
 async function seed() {
-  console.log("Seeding local.db with sample catalogue products...");
+  console.log(`Seeding ${url} with sample catalogue products...`);
 
   const existing = await client.execute("SELECT COUNT(*) as count FROM products");
   if (existing.rows[0].count > 0) {

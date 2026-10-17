@@ -15,16 +15,25 @@ if (isProduction && !authSecret) {
 }
 
 const secret = authSecret || "si-and-billionaires-hub-dev-secret-32-chars-long";
-const baseURL = process.env["BETTER_AUTH_URL"] || "http://localhost:3000";
+const vercelUrl = process.env["VERCEL_PROJECT_PRODUCTION_URL"] || process.env["VERCEL_URL"];
+const baseURL =
+  process.env["BETTER_AUTH_URL"] ||
+  (vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000");
+
+const defaultOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:8080",
+  ...(vercelUrl ? [`https://${vercelUrl}`] : []),
+  ...(process.env["VERCEL_URL"] ? [`https://${process.env["VERCEL_URL"]}`] : []),
+];
 
 const trustedOrigins = process.env["TRUSTED_ORIGINS"]
-  ? process.env["TRUSTED_ORIGINS"].split(",").map((s) => s.trim())
-  : [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "http://127.0.0.1:3000",
-      "http://127.0.0.1:5173",
-    ];
+  ? [...process.env["TRUSTED_ORIGINS"].split(",").map((s) => s.trim()), ...defaultOrigins]
+  : defaultOrigins;
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

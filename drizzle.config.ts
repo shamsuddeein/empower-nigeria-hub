@@ -1,5 +1,11 @@
 import { defineConfig } from "drizzle-kit";
 
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
+
 export default defineConfig({
   dialect: "turso",
   schema: "./src/server/db/schema.ts",

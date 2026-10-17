@@ -2,6 +2,12 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
+if (typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
+
 const isProduction = process.env["NODE_ENV"] === "production";
 const tursoUrl = process.env["TURSO_DATABASE_URL"];
 const tursoAuthToken = process.env["TURSO_AUTH_TOKEN"];

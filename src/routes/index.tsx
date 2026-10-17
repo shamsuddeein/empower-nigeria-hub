@@ -97,7 +97,7 @@ function Home() {
             ))}
           </ul>
           <div className="hidden lg:block">
-            <Photo label={services[hover].photo} ratio="aspect-[4/5]" className="sticky top-28" />
+            <Photo label={services[hover]!.photo} ratio="aspect-[4/5]" className="sticky top-28" />
           </div>
         </div>
       </Section>

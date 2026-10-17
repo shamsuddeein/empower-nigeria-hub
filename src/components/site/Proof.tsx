@@ -14,7 +14,7 @@ export function Testimonials({ category, title = "What customers say" }: { categ
       </div>
     );
   if (!data?.length) return null;
-  const [first, ...rest] = data;
+  const first = data[0]!; const rest = data.slice(1);
   return (
     <div>
       <h2 className="mb-6 text-2xl font-extrabold md:text-3xl">{title}</h2>

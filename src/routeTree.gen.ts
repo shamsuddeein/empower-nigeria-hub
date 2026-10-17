@@ -10,7 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AgentLocatorRouteImport } from './routes/agent-locator'
+import { Route as ApplyRouteImport } from './routes/apply'
+import { Route as BecomeAnAgentRouteImport } from './routes/become-an-agent'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ElectricVehiclesRouteImport } from './routes/electric-vehicles'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as FinancialServicesAndTrainingRouteImport } from './routes/financial-services-and-training'
+import { Route as LandAndEstateRouteImport } from './routes/land-and-estate'
+import { Route as PhonesAndGadgetsRouteImport } from './routes/phones-and-gadgets'
 import { Route as SolarRouteImport } from './routes/solar'
 
 const IndexRoute = IndexRouteImport.update({
@@ -18,9 +27,55 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentLocatorRoute = AgentLocatorRouteImport.update({
+  id: '/agent-locator',
+  path: '/agent-locator',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApplyRoute = ApplyRouteImport.update({
+  id: '/apply',
+  path: '/apply',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BecomeAnAgentRoute = BecomeAnAgentRouteImport.update({
+  id: '/become-an-agent',
+  path: '/become-an-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ElectricVehiclesRoute = ElectricVehiclesRouteImport.update({
   id: '/electric-vehicles',
   path: '/electric-vehicles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinancialServicesAndTrainingRoute =
+  FinancialServicesAndTrainingRouteImport.update({
+    id: '/financial-services-and-training',
+    path: '/financial-services-and-training',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LandAndEstateRoute = LandAndEstateRouteImport.update({
+  id: '/land-and-estate',
+  path: '/land-and-estate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PhonesAndGadgetsRoute = PhonesAndGadgetsRouteImport.update({
+  id: '/phones-and-gadgets',
+  path: '/phones-and-gadgets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SolarRoute = SolarRouteImport.update({
@@ -31,31 +86,104 @@ const SolarRoute = SolarRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/agent-locator': typeof AgentLocatorRoute
+  '/apply': typeof ApplyRoute
+  '/become-an-agent': typeof BecomeAnAgentRoute
+  '/contact': typeof ContactRoute
   '/electric-vehicles': typeof ElectricVehiclesRoute
+  '/faq': typeof FaqRoute
+  '/financial-services-and-training': typeof FinancialServicesAndTrainingRoute
+  '/land-and-estate': typeof LandAndEstateRoute
+  '/phones-and-gadgets': typeof PhonesAndGadgetsRoute
   '/solar': typeof SolarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/agent-locator': typeof AgentLocatorRoute
+  '/apply': typeof ApplyRoute
+  '/become-an-agent': typeof BecomeAnAgentRoute
+  '/contact': typeof ContactRoute
   '/electric-vehicles': typeof ElectricVehiclesRoute
+  '/faq': typeof FaqRoute
+  '/financial-services-and-training': typeof FinancialServicesAndTrainingRoute
+  '/land-and-estate': typeof LandAndEstateRoute
+  '/phones-and-gadgets': typeof PhonesAndGadgetsRoute
   '/solar': typeof SolarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/agent-locator': typeof AgentLocatorRoute
+  '/apply': typeof ApplyRoute
+  '/become-an-agent': typeof BecomeAnAgentRoute
+  '/contact': typeof ContactRoute
   '/electric-vehicles': typeof ElectricVehiclesRoute
+  '/faq': typeof FaqRoute
+  '/financial-services-and-training': typeof FinancialServicesAndTrainingRoute
+  '/land-and-estate': typeof LandAndEstateRoute
+  '/phones-and-gadgets': typeof PhonesAndGadgetsRoute
   '/solar': typeof SolarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/electric-vehicles' | '/solar'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/agent-locator'
+    | '/apply'
+    | '/become-an-agent'
+    | '/contact'
+    | '/electric-vehicles'
+    | '/faq'
+    | '/financial-services-and-training'
+    | '/land-and-estate'
+    | '/phones-and-gadgets'
+    | '/solar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/electric-vehicles' | '/solar'
-  id: '__root__' | '/' | '/electric-vehicles' | '/solar'
+  to:
+    | '/'
+    | '/about'
+    | '/agent-locator'
+    | '/apply'
+    | '/become-an-agent'
+    | '/contact'
+    | '/electric-vehicles'
+    | '/faq'
+    | '/financial-services-and-training'
+    | '/land-and-estate'
+    | '/phones-and-gadgets'
+    | '/solar'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/agent-locator'
+    | '/apply'
+    | '/become-an-agent'
+    | '/contact'
+    | '/electric-vehicles'
+    | '/faq'
+    | '/financial-services-and-training'
+    | '/land-and-estate'
+    | '/phones-and-gadgets'
+    | '/solar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  AgentLocatorRoute: typeof AgentLocatorRoute
+  ApplyRoute: typeof ApplyRoute
+  BecomeAnAgentRoute: typeof BecomeAnAgentRoute
+  ContactRoute: typeof ContactRoute
   ElectricVehiclesRoute: typeof ElectricVehiclesRoute
+  FaqRoute: typeof FaqRoute
+  FinancialServicesAndTrainingRoute: typeof FinancialServicesAndTrainingRoute
+  LandAndEstateRoute: typeof LandAndEstateRoute
+  PhonesAndGadgetsRoute: typeof PhonesAndGadgetsRoute
   SolarRoute: typeof SolarRoute
 }
 
@@ -68,11 +196,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-locator': {
+      id: '/agent-locator'
+      path: '/agent-locator'
+      fullPath: '/agent-locator'
+      preLoaderRoute: typeof AgentLocatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/apply': {
+      id: '/apply'
+      path: '/apply'
+      fullPath: '/apply'
+      preLoaderRoute: typeof ApplyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/become-an-agent': {
+      id: '/become-an-agent'
+      path: '/become-an-agent'
+      fullPath: '/become-an-agent'
+      preLoaderRoute: typeof BecomeAnAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/electric-vehicles': {
       id: '/electric-vehicles'
       path: '/electric-vehicles'
       fullPath: '/electric-vehicles'
       preLoaderRoute: typeof ElectricVehiclesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financial-services-and-training': {
+      id: '/financial-services-and-training'
+      path: '/financial-services-and-training'
+      fullPath: '/financial-services-and-training'
+      preLoaderRoute: typeof FinancialServicesAndTrainingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/land-and-estate': {
+      id: '/land-and-estate'
+      path: '/land-and-estate'
+      fullPath: '/land-and-estate'
+      preLoaderRoute: typeof LandAndEstateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/phones-and-gadgets': {
+      id: '/phones-and-gadgets'
+      path: '/phones-and-gadgets'
+      fullPath: '/phones-and-gadgets'
+      preLoaderRoute: typeof PhonesAndGadgetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/solar': {
@@ -87,7 +278,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  AgentLocatorRoute: AgentLocatorRoute,
+  ApplyRoute: ApplyRoute,
+  BecomeAnAgentRoute: BecomeAnAgentRoute,
+  ContactRoute: ContactRoute,
   ElectricVehiclesRoute: ElectricVehiclesRoute,
+  FaqRoute: FaqRoute,
+  FinancialServicesAndTrainingRoute: FinancialServicesAndTrainingRoute,
+  LandAndEstateRoute: LandAndEstateRoute,
+  PhonesAndGadgetsRoute: PhonesAndGadgetsRoute,
   SolarRoute: SolarRoute,
 }
 export const routeTree = rootRouteImport

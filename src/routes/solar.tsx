@@ -108,7 +108,7 @@ function SolarPage() {
               {packages?.map((p) => {
                 const w = calculatePlan({ price: p.cash_price, months: 12, frequency: "weekly", markups });
                 const m = calculatePlan({ price: p.cash_price, months: 12, frequency: "monthly", markups });
-                const specs = p.specs as Record<string, string>;
+                const specs = p.specs as any;
                 return (
                   <tr key={p.id} className="border-t align-top">
                     <th scope="row" className="p-3 font-display font-bold text-navy">{p.name.replace(" business system", "")}</th>

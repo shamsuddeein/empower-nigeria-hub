@@ -76,7 +76,7 @@ function EvPage() {
       return data;
     },
   });
-  const list = (data ?? []).filter((v) => type === "all" || (v.specs as Record<string, string>).type === type);
+  const list = (data ?? []).filter((v) => type === "all" || (v.specs as any).type === type);
 
   return (
     <>
@@ -104,7 +104,7 @@ function EvPage() {
           {isLoading && [0, 1].map((i) => <li key={i} className="py-5"><Skeleton className="h-40" /></li>)}
           {!isLoading && !list.length && <li className="py-8 text-muted-foreground">No vehicles of this type right now. Ask us on WhatsApp for the next arrival.</li>}
           {list.map((v) => {
-            const s = v.specs as Record<string, string>;
+            const s = v.specs as any;
             const w = calculatePlan({ price: v.cash_price, months: 12, frequency: "weekly", markups });
             return (
               <li key={v.id} className="grid gap-5 py-6 md:grid-cols-[280px_1fr_auto] md:items-center">

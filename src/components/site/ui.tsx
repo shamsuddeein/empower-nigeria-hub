@@ -63,7 +63,7 @@ export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: st
 }
 
 /** Labeled placeholder where a real photo will go. Pass src to show a real image. */
-export function Photo({ label, src, className, ratio = "aspect-[4/3]", eager }: { label: string; src?: string | null; className?: string; ratio?: string; eager?: boolean }) {
+export function Photo({ label, src, className, ratio = "aspect-[4/3]", eager }: { label: string; src?: string | null | undefined; className?: string; ratio?: string; eager?: boolean }) {
   if (src)
     return (
       <div className={cn("overflow-hidden rounded-lg bg-muted", ratio, className)}>
@@ -91,7 +91,7 @@ export function Badge({ children, tone = "neutral", className }: { children: Rea
 const inputCls =
   "w-full rounded-md border border-input bg-surface px-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring aria-[invalid=true]:border-destructive";
 
-type FieldBase = { label: string; error?: string; hint?: string; optional?: boolean };
+type FieldBase = { label: string; error?: string | undefined; hint?: string | undefined; optional?: boolean | undefined };
 
 function FieldWrap({ id, label, error, hint, optional, children }: FieldBase & { id: string; children: ReactNode }) {
   return (

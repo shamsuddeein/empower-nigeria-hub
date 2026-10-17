@@ -8,7 +8,7 @@ export function markupFor(months: number, markups: Record<number, number> = defa
   const keys = Object.keys(markups).map(Number).sort((a, b) => a - b);
   if (!keys.length) return 0;
   const k = keys.find((d) => d >= months) ?? keys[keys.length - 1];
-  return markups[k];
+  return markups[k!] ?? 0;
 }
 
 export type PlanInput = {

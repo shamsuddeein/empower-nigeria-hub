@@ -8,6 +8,13 @@
       "when": 1792202952451,
       "tag": "0000_site_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792202975407,
+      "tag": "0001_media_policies",
+      "breakpoints": true
     }
   ]
 }

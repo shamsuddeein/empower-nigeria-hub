@@ -1,3 +1,11 @@
+export const landingNav = [
+  { href: "#services-overview", label: "Services" },
+  { href: "#how-it-works", label: "How It Works" },
+  { href: "#about", label: "About" },
+  { href: "#faq", label: "FAQ" },
+  { href: "#contact", label: "Contact" },
+] as const;
+
 export const primaryNav = [
   { to: "/solar", label: "Solar" },
   { to: "/electric-vehicles", label: "Electric Vehicles" },

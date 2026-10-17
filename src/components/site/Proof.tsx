@@ -77,7 +77,7 @@ export function Gallery({ category }: { category?: string }) {
       ))}
       <div className="col-span-2 md:col-span-4">
         {video?.video_url ? <VideoEmbed url={video.video_url} label={video.caption ?? "Installation"} /> : (
-          <div className="flex aspect-[21/9] items-center justify-center rounded-lg border border-dashed border-input bg-muted text-sm text-muted-foreground">Video: a customer walks through their installation (added from admin)</div>
+          <div className="flex aspect-[21/9] items-center justify-center rounded-lg border border-dashed border-input bg-muted text-sm text-muted-foreground">Video: customer walks through their commercial installation</div>
         )}
       </div>
     </div>

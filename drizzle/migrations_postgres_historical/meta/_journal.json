@@ -15,6 +15,13 @@
       "when": 1792202975407,
       "tag": "0001_media_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792203000000,
+      "tag": "0002_coherent_publishing_and_security",
+      "breakpoints": true
     }
   ]
 }

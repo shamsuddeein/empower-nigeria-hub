@@ -1,30 +1,117 @@
+import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { MessageCircle, Phone } from "lucide-react";
+import { Phone, MessageCircle } from "lucide-react";
 import { useCompany } from "@/lib/data";
 import { cn } from "@/lib/utils";
-import { primaryNav } from "./nav";
 import { btn } from "./ui";
 
-/** Mobile bottom bar (Call + WhatsApp) and desktop floating WhatsApp button. Hidden on /apply. */
+/**
+ * Floating Call or WhatsApp actions.
+ * Only shown when genuine contact details are configured.
+ * Hidden on /apply, /admin, while a menu/dialog is open, or when #enquire is visible.
+ */
 export function ContactBar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const { wa, tel } = useCompany();
-  if (path.startsWith("/apply")) return null;
-  const topic = primaryNav.find((n) => path.startsWith(n.to))?.label ?? "your products and payment plans";
+  const { wa, tel, hasRealPhone, hasRealWhatsApp } = useCompany();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEnquiryVisible, setIsEnquiryVisible] = useState(false);
+
+  // Hidden on /apply and /admin
+  const isHiddenRoute = path.startsWith("/apply") || path.startsWith("/admin");
+
+  // Detect open dialogs (mobile menu, application modal) or locked body scroll
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const checkDialog = () => {
+      const dialog = document.querySelector('[role="dialog"]');
+      const bodyLocked = document.body.style.overflow === "hidden";
+      setIsDialogOpen(Boolean(dialog || bodyLocked));
+    };
+
+    checkDialog();
+    const observer = new MutationObserver(checkDialog);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Detect when the enquiry form (#enquire) is visible in the viewport
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const el = document.getElementById("enquire");
+    if (!el) {
+      setIsEnquiryVisible(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) {
+          setIsEnquiryVisible(entry.isIntersecting);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [path]);
+
+  // Only show when genuine contact details exist and on valid routes
+  if (isHiddenRoute || (!hasRealPhone && !hasRealWhatsApp)) {
+    return null;
+  }
+
+  // Hide while menu/dialog is open or enquiry form is in view
+  if (isDialogOpen || isEnquiryVisible) {
+    return null;
+  }
+
   return (
-    <>
-      <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t bg-surface p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-        <a href={tel} className={btn({ variant: "secondary" })}><Phone className="size-5" aria-hidden />Call us</a>
-        <a href={wa(topic)} target="_blank" rel="noopener noreferrer" className={btn({ variant: "primary" })}><MessageCircle className="size-5" aria-hidden />WhatsApp</a>
-      </div>
-      <a href={wa(topic)} target="_blank" rel="noopener noreferrer" className={cn(btn({ variant: "primary" }), "fixed bottom-6 right-6 z-30 hidden shadow-lg md:inline-flex")}>
-        <MessageCircle className="size-5" aria-hidden />WhatsApp
-      </a>
-    </>
+    <div
+      className="fixed bottom-6 right-6 z-30 flex flex-col sm:flex-row items-end gap-2.5 transition-all duration-200"
+      aria-label="Quick contact options"
+    >
+      {hasRealPhone && (
+        <a
+          href={tel}
+          className={cn(
+            btn({ variant: "secondary" }),
+            "shadow-lg hover:shadow-xl font-semibold gap-2 rounded-full px-4 py-2.5 h-12 bg-surface border-navy/20 text-navy hover:bg-accent"
+          )}
+          aria-label="Call Us"
+        >
+          <Phone className="size-4 shrink-0 text-navy" />
+          <span>Call Us</span>
+        </a>
+      )}
+      {hasRealWhatsApp && (
+        <a
+          href={wa()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            btn({ variant: "primary" }),
+            "shadow-lg hover:shadow-xl font-semibold gap-2 rounded-full px-4 py-2.5 h-12"
+          )}
+          aria-label="Chat on WhatsApp"
+        >
+          <MessageCircle className="size-4 shrink-0" />
+          <span>WhatsApp</span>
+        </a>
+      )}
+    </div>
   );
 }
 
 export function useHasContactBar() {
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  return !path.startsWith("/apply") && !path.startsWith("/admin");
+  return false;
 }

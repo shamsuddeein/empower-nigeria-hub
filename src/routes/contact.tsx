@@ -1,14 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { FinalCta } from "@/components/site/CallWhatsApp";
-import { PageHeader } from "@/components/site/ui";
-import { seo } from "@/lib/seo";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/contact")({
-  head: () => seo("Contact us", "Call, WhatsApp or visit our office."),
-  component: () => (
-    <>
-      <PageHeader title="Contact us">Call, WhatsApp or visit our office.</PageHeader>
-      <FinalCta topic="Contact us" />
-    </>
-  ),
+  beforeLoad: () => {
+    throw redirect({
+      to: "/",
+      hash: "enquire",
+    });
+  },
+  component: () => null,
 });

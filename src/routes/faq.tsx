@@ -1,14 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { FinalCta } from "@/components/site/CallWhatsApp";
-import { PageHeader } from "@/components/site/ui";
-import { seo } from "@/lib/seo";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/faq")({
-  head: () => seo("Questions and answers", "Plain answers about plans, payments and products."),
-  component: () => (
-    <>
-      <PageHeader title="Questions and answers">Plain answers about plans, payments and products.</PageHeader>
-      <FinalCta topic="Questions and answers" />
-    </>
-  ),
+  beforeLoad: () => {
+    throw redirect({
+      to: "/",
+      hash: "faq",
+    });
+  },
+  component: () => null,
 });

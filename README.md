@@ -1,4 +1,4 @@
-# Empower Nigeria Hub
+# S.i and Billionaires Hub Nig.Ltd
 
 Build the global layout.
 

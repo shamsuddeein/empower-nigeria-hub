@@ -86,7 +86,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap",
       },
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
+      { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
     scripts: [{ type: "application/ld+json", children: JSON.stringify(orgJsonLd) }],
   }),
@@ -101,6 +103,36 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    var unregisteredAny = false;
+    for (var i = 0; i < registrations.length; i++) {
+      var r = registrations[i];
+      if (r.scope.indexOf("localhost") !== -1 || r.scope.indexOf("127.0.0.1") !== -1) {
+        r.unregister();
+        unregisteredAny = true;
+        console.info("[SW-Cleanup] Unregistered obsolete service worker for:", r.scope);
+      }
+    }
+    if (unregisteredAny && navigator.serviceWorker.controller) {
+      window.location.reload();
+    }
+  });
+  if ("caches" in window) {
+    caches.keys().then(function(keys) {
+      for (var k = 0; k < keys.length; k++) {
+        caches.delete(keys[k]);
+        console.info("[SW-Cleanup] Purged cache:", keys[k]);
+      }
+    });
+  }
+}
+            `,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -114,7 +146,6 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = path.startsWith("/admin");
-  const hideBar = path.startsWith("/apply");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -129,9 +160,7 @@ function RootComponent() {
           <main id="main">
             <Outlet />
           </main>
-          <div className={hideBar ? "" : "pb-[72px] md:pb-0"}>
-            <SiteFooter />
-          </div>
+          <SiteFooter />
           <ContactBar />
         </>
       )}

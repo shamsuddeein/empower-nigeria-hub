@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AgentLocatorRouteImport } from './routes/agent-locator'
 import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as BecomeAnAgentRouteImport } from './routes/become-an-agent'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentLocatorRoute = AgentLocatorRouteImport.update({
@@ -87,6 +93,7 @@ const SolarRoute = SolarRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/agent-locator': typeof AgentLocatorRoute
   '/apply': typeof ApplyRoute
   '/become-an-agent': typeof BecomeAnAgentRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/agent-locator': typeof AgentLocatorRoute
   '/apply': typeof ApplyRoute
   '/become-an-agent': typeof BecomeAnAgentRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/agent-locator': typeof AgentLocatorRoute
   '/apply': typeof ApplyRoute
   '/become-an-agent': typeof BecomeAnAgentRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/admin'
     | '/agent-locator'
     | '/apply'
     | '/become-an-agent'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/admin'
     | '/agent-locator'
     | '/apply'
     | '/become-an-agent'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/admin'
     | '/agent-locator'
     | '/apply'
     | '/become-an-agent'
@@ -175,6 +187,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AdminRoute: typeof AdminRoute
   AgentLocatorRoute: typeof AgentLocatorRoute
   ApplyRoute: typeof ApplyRoute
   BecomeAnAgentRoute: typeof BecomeAnAgentRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agent-locator': {
@@ -279,6 +299,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AdminRoute: AdminRoute,
   AgentLocatorRoute: AgentLocatorRoute,
   ApplyRoute: ApplyRoute,
   BecomeAnAgentRoute: BecomeAnAgentRoute,

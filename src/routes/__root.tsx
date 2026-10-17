@@ -126,7 +126,7 @@ function RootComponent() {
             Skip to content
           </a>
           <SiteHeader />
-          <main id="main" className={hideBar ? "" : "pb-20 md:pb-0"}>
+          <main id="main">
             <Outlet />
           </main>
           <div className={hideBar ? "" : "pb-[72px] md:pb-0"}>

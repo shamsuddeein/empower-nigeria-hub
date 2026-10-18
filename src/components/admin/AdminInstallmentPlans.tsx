@@ -6,8 +6,13 @@ import {
 import { formatNaira } from "@/lib/format";
 import { calculatePlan, defaultMarkups } from "@/lib/installments";
 
+const defaultRulesList = Object.entries(defaultMarkups).map(([d, m]) => ({
+  duration_months: Number(d),
+  markup_percent: m,
+}));
+
 export function AdminInstallmentPlans() {
-  const [rules, setRules] = useState<{ duration_months: number; markup_percent: number }[]>([]);
+  const [rules, setRules] = useState<{ duration_months: number; markup_percent: number }[]>(defaultRulesList);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -23,12 +28,7 @@ export function AdminInstallmentPlans() {
       if (data && data.length) {
         setRules(data);
       } else {
-        // Fallback to default markups if empty
-        const def = Object.entries(defaultMarkups).map(([d, m]) => ({
-          duration_months: Number(d),
-          markup_percent: m,
-        }));
-        setRules(def);
+        setRules(defaultRulesList);
       }
     } catch (err) {
       console.error("Error fetching rules:", err);
@@ -68,9 +68,9 @@ export function AdminInstallmentPlans() {
   };
 
   // Convert rules to record for simulator
-  const currentMarkupsRecord = Object.fromEntries(
-    rules.map((r) => [r.duration_months, r.markup_percent])
-  );
+  const currentMarkupsRecord = rules.length > 0
+    ? Object.fromEntries(rules.map((r) => [r.duration_months, r.markup_percent]))
+    : defaultMarkups;
 
   const deposit = simCategory === "solar" ? 0 : Math.round(simPrice * 0.1);
 

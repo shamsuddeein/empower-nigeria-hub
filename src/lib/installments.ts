@@ -22,26 +22,27 @@ export function markupFor(
   months: number,
   markups: Record<number, number> = defaultMarkups
 ): number {
-  if (markups[months] !== undefined) {
-    return markups[months];
+  const activeMarkups = markups && Object.keys(markups).length > 0 ? markups : defaultMarkups;
+  if (activeMarkups[months] !== undefined) {
+    return activeMarkups[months];
   }
-  const durations = Object.keys(markups)
+  const durations = Object.keys(activeMarkups)
     .map(Number)
     .sort((a, b) => a - b);
   if (durations.length === 0) {
-    throw new Error("No installment durations configured.");
+    return defaultMarkups[months] ?? 20;
   }
   // Find next configured markup tier >= months
   const nextDuration = durations.find((d) => d >= months);
-  if (nextDuration !== undefined && markups[nextDuration] !== undefined) {
-    return markups[nextDuration];
+  if (nextDuration !== undefined && activeMarkups[nextDuration] !== undefined) {
+    return activeMarkups[nextDuration];
   }
   // Fall back to the maximum configured duration tier
   const maxDuration = durations[durations.length - 1];
-  if (maxDuration !== undefined && markups[maxDuration] !== undefined) {
-    return markups[maxDuration];
+  if (maxDuration !== undefined && activeMarkups[maxDuration] !== undefined) {
+    return activeMarkups[maxDuration];
   }
-  throw new Error(`Unsupported duration: ${months} months.`);
+  return defaultMarkups[months] ?? 20;
 }
 
 export type PlanInput = {

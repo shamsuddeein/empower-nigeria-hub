@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   useCompany,
   useMarkups,
+  companyQuery,
   productsQuery,
   plotsQuery,
   coursesQuery,
@@ -49,6 +50,11 @@ export const Route = createFileRoute("/")({
       "Power your daily life and business.",
       "We offer business solar, electric motorcycles and tricycles, phones and gadgets, land and estate, financial services, and practical training with structured installment plans for eligible products."
     ),
+  loader: async ({ context }: { context: { queryClient?: import("@tanstack/react-query").QueryClient } }) => {
+    if (context?.queryClient) {
+      await context.queryClient.ensureQueryData(companyQuery).catch(() => {});
+    }
+  },
   component: PublicLandingPage,
 });
 
@@ -177,26 +183,39 @@ export function PublicLandingPage() {
   const {
     data: allProducts,
     isError: isProductsError,
+    isLoading: isProductsLoading,
     refetch: refetchProducts,
   } = useQuery(productsQuery);
 
   const {
     data: allPlots,
     isError: isPlotsError,
+    isLoading: isPlotsLoading,
     refetch: refetchPlots,
   } = useQuery(plotsQuery);
 
   const {
     data: allCourses,
     isError: isCoursesError,
+    isLoading: isCoursesLoading,
     refetch: refetchCourses,
   } = useQuery(coursesQuery);
 
   const {
     data: allAgentsList,
     isError: isAgentsError,
+    isLoading: isAgentsLoading,
     refetch: refetchAgents,
   } = useQuery(agentsQuery);
+
+  // Synchronize training course selection so dropdown display and submission payload always agree
+  const effectiveCourseId =
+    trainCourseId || (allCourses && allCourses.length > 0 ? allCourses[0]?.id ?? "" : "");
+  const selectedCourse = (allCourses ?? []).find((c) => c.id === effectiveCourseId);
+  const effectiveCourseTitle =
+    selectedCourse?.title ||
+    trainCourseTitle ||
+    (allCourses && allCourses.length > 0 ? allCourses[0]?.title ?? "Solar Installation Training" : "Solar Installation Training");
 
   const approvedAgents = (allAgentsList ?? []).filter(
     (ag) => ag.state === selectedState
@@ -297,15 +316,12 @@ export function PublicLandingPage() {
       return;
     }
 
-    const selectedCourse = (allCourses ?? []).find((c) => c.id === trainCourseId);
-    const courseTitle = selectedCourse ? selectedCourse.title : (trainCourseTitle || "Vocational Skills Training");
-
     setTrainSubmitting(true);
     try {
       await submitTrainingSignupFn({
         data: {
-          courseId: trainCourseId || null,
-          courseTitle,
+          courseId: selectedCourse?.id ?? (effectiveCourseId || null),
+          courseTitle: effectiveCourseTitle,
           fullName: trainFullName.trim(),
           phone: cleanPhone,
           state: trainState,
@@ -448,7 +464,7 @@ export function PublicLandingPage() {
                       "font-semibold text-navy hover:text-navy"
                     )}
                   >
-                    Chat on WhatsApp
+                    Send an Enquiry
                   </a>
                 )}
 
@@ -1362,7 +1378,22 @@ export function PublicLandingPage() {
           </div>
 
           {/* Product Grid */}
-          {isProductsError ? (
+          {isProductsLoading ? (
+            <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-xl border border-border bg-surface p-5 space-y-4"
+                >
+                  <div className="h-4 bg-muted rounded w-1/3" />
+                  <div className="h-6 bg-muted rounded w-3/4" />
+                  <div className="aspect-[16/10] bg-muted rounded-lg" />
+                  <div className="h-14 bg-muted rounded-md" />
+                  <div className="h-9 bg-muted rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : isProductsError ? (
             <div className="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
               <p className="font-semibold text-destructive">
                 Unable to load product catalogue.
@@ -1492,17 +1523,25 @@ export function PublicLandingPage() {
                     No products published under this category currently.
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    New inventory is updated regularly. Chat on WhatsApp
-                    to request specific device models.
+                    New inventory is updated regularly. {hasRealWhatsApp ? "Chat on WhatsApp to request specific device models." : "Submit an enquiry to request specific device models."}
                   </p>
-                  <a
-                    href={wa("Inquiring about available phone or gadget stock")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(btn({ variant: "secondary", size: "sm" }), "mt-4 font-semibold text-navy")}
-                  >
-                    Inquire on WhatsApp
-                  </a>
+                  {hasRealWhatsApp ? (
+                    <a
+                      href={wa("Inquiring about available phone or gadget stock")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(btn({ variant: "secondary", size: "sm" }), "mt-4 font-semibold text-navy")}
+                    >
+                      Inquire on WhatsApp
+                    </a>
+                  ) : (
+                    <a
+                      href="#enquire"
+                      className={cn(btn({ variant: "secondary", size: "sm" }), "mt-4 font-semibold text-navy")}
+                    >
+                      Send an Enquiry
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -1536,7 +1575,22 @@ export function PublicLandingPage() {
             </div>
           </div>
 
-          {isPlotsError ? (
+          {isPlotsLoading ? (
+            <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-xl border border-border bg-background p-6 space-y-4"
+                >
+                  <div className="h-4 bg-muted rounded w-1/2" />
+                  <div className="h-6 bg-muted rounded w-3/4" />
+                  <div className="aspect-[16/10] bg-muted rounded-lg" />
+                  <div className="h-14 bg-muted rounded-md" />
+                  <div className="h-9 bg-muted rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : isPlotsError ? (
             <div className="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
               <p className="font-semibold text-destructive">
                 Unable to load land listings.
@@ -1937,7 +1991,21 @@ export function PublicLandingPage() {
                 In-person technical courses held at our Kaduna training centre.
               </p>
 
-              {isCoursesError ? (
+              {isCoursesLoading ? (
+                <div className="mt-6 space-y-4">
+                  {[1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="animate-pulse min-w-0 rounded-lg border border-border bg-background p-4 space-y-3"
+                    >
+                      <div className="h-5 bg-muted rounded w-1/2" />
+                      <div className="h-4 bg-muted rounded w-1/3" />
+                      <div className="h-10 bg-muted rounded" />
+                      <div className="h-8 bg-muted rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : isCoursesError ? (
                 <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center">
                   <p className="font-semibold text-destructive text-sm">
                     Unable to load vocational courses.
@@ -2005,13 +2073,20 @@ export function PublicLandingPage() {
                     <p className="font-bold text-action">Registration Received</p>
                     <p className="mt-1">
                       Thank you, {trainFullName}. Our training team will contact you on{" "}
-                      {trainPhone} with orientation details for {trainCourseTitle}.
+                      {trainPhone} with orientation details for {effectiveCourseTitle}.
                     </p>
                   </div>
                 ) : (
                   <form onSubmit={handleTrainSubmit} className="mt-3 space-y-3">
                     {trainError && (
-                      <p className="text-xs text-destructive">{trainError}</p>
+                      <div
+                        id={`${genId}-train-error`}
+                        role="alert"
+                        aria-live="polite"
+                        className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium"
+                      >
+                        {trainError}
+                      </div>
                     )}
                     <div className="grid gap-2 sm:grid-cols-2">
                       <div className="space-y-1">
@@ -2028,6 +2103,8 @@ export function PublicLandingPage() {
                           value={trainFullName}
                           onChange={(e) => setTrainFullName(e.target.value)}
                           placeholder="Your Full Name"
+                          aria-describedby={trainError ? `${genId}-train-error` : undefined}
+                          aria-invalid={Boolean(trainError)}
                           className={inputCls}
                         />
                       </div>
@@ -2045,6 +2122,8 @@ export function PublicLandingPage() {
                           value={trainPhone}
                           onChange={(e) => setTrainPhone(e.target.value)}
                           placeholder="Phone Number (e.g. 0803...)"
+                          aria-describedby={trainError ? `${genId}-train-error` : undefined}
+                          aria-invalid={Boolean(trainError)}
                           className={inputCls}
                         />
                       </div>
@@ -2059,7 +2138,7 @@ export function PublicLandingPage() {
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <select
                           id={`${genId}-train-course`}
-                          value={trainCourseId || trainCourseTitle}
+                          value={effectiveCourseId}
                           onChange={(e) => {
                             const val = e.target.value;
                             const found = (allCourses ?? []).find(
@@ -2069,10 +2148,11 @@ export function PublicLandingPage() {
                               setTrainCourseId(found.id);
                               setTrainCourseTitle(found.title);
                             } else {
-                              setTrainCourseId("");
+                              setTrainCourseId(val);
                               setTrainCourseTitle(val);
                             }
                           }}
+                          aria-describedby={trainError ? `${genId}-train-error` : undefined}
                           className={cn(inputCls, "cursor-pointer flex-1")}
                         >
                           {allCourses && allCourses.length > 0 ? (
@@ -2450,7 +2530,24 @@ export function PublicLandingPage() {
           </div>
 
           {/* Agent Results */}
-          {isAgentsError ? (
+          {isAgentsLoading ? (
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="animate-pulse rounded-xl border border-border bg-surface p-5 space-y-3"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-muted rounded w-1/3" />
+                    <div className="h-4 bg-muted rounded w-1/4" />
+                  </div>
+                  <div className="h-6 bg-muted rounded w-2/3" />
+                  <div className="h-4 bg-muted rounded w-1/2" />
+                  <div className="h-9 bg-muted rounded mt-2" />
+                </div>
+              ))}
+            </div>
+          ) : isAgentsError ? (
             <div className="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
               <p className="font-semibold text-destructive">
                 Unable to load regional agents list.

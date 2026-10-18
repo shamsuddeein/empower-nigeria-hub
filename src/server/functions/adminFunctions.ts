@@ -31,7 +31,14 @@ export const getAdminOverviewFn = createServerFn({ method: "GET" }).handler(asyn
 
   const [productsCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.products);
   const [plotsCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.plots);
+  const [landInquiriesCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.land_inquiries);
+  const [newLandInquiriesCount] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.land_inquiries)
+    .where(eq(schema.land_inquiries.status, "New"));
+
   const [coursesCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.training_courses);
+  const [trainingSignupsCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.training_signups);
 
   return {
     totalApplications: Number(appsCount?.count ?? 0),
@@ -42,7 +49,10 @@ export const getAdminOverviewFn = createServerFn({ method: "GET" }).handler(asyn
     unreadMessages: Number(unreadMessagesCount?.count ?? 0),
     totalProducts: Number(productsCount?.count ?? 0),
     totalPlots: Number(plotsCount?.count ?? 0),
+    totalLandInquiries: Number(landInquiriesCount?.count ?? 0),
+    newLandInquiries: Number(newLandInquiriesCount?.count ?? 0),
     totalCourses: Number(coursesCount?.count ?? 0),
+    totalTrainingSignups: Number(trainingSignupsCount?.count ?? 0),
   };
 });
 

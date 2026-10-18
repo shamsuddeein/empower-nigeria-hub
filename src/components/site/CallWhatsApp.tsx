@@ -9,18 +9,25 @@ export function WhatsAppButton({
   variant = "secondary",
   children,
   className,
+  fallbackText = "Contact Us",
 }: {
   topic?: string;
   raw?: boolean;
   variant?: "secondary" | "primary" | "navy" | "onNavy" | "onAction";
   children?: ReactNode;
   className?: string;
+  fallbackText?: string;
 }) {
   const { wa, hasRealWhatsApp } = useCompany();
   if (!hasRealWhatsApp) {
+    // Prevent misleading "Chat on WhatsApp" wording when WhatsApp is unavailable
+    const isWaText =
+      typeof children === "string" && /whatsapp/i.test(children);
+    const displayText = isWaText ? fallbackText : (children ?? fallbackText);
+
     return (
       <a href="#enquire" className={btn({ variant, className })}>
-        {children ?? "Submit Enquiry"}
+        {displayText}
       </a>
     );
   }
@@ -40,16 +47,22 @@ export function CallButton({
   variant = "secondary",
   className,
   children,
+  fallbackText = "Contact Us",
 }: {
   variant?: "secondary" | "navy" | "onNavy" | "primary";
   className?: string;
   children?: ReactNode;
+  fallbackText?: string;
 }) {
   const { tel, company, hasRealPhone } = useCompany();
   if (!hasRealPhone) {
+    const isCallText =
+      typeof children === "string" && /call/i.test(children);
+    const displayText = isCallText ? fallbackText : (children ?? fallbackText);
+
     return (
       <a href="#enquire" className={btn({ variant, className })}>
-        {children ?? "Submit Enquiry"}
+        {displayText}
       </a>
     );
   }
@@ -60,45 +73,18 @@ export function CallButton({
   );
 }
 
-/** Final call to action block used at the bottom of pages. */
-export function FinalCta({
-  title = "Ready to start?",
-  topic,
-  text,
+export function ContactUsButton({
+  variant = "primary",
+  className,
+  children,
 }: {
-  title?: string;
-  topic: string;
-  text?: string;
+  variant?: "primary" | "secondary" | "navy" | "onNavy" | "onAction";
+  className?: string;
+  children?: ReactNode;
 }) {
-  const { company, tel, hasRealPhone } = useCompany();
   return (
-    <section className="py-14 md:py-20">
-      <div className="container-site grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-end">
-        <div>
-          <h2 className="text-3xl font-extrabold md:text-4xl">{title}</h2>
-          <p className="mt-3 max-w-xl text-lg text-muted-foreground">
-            {text ??
-              "Fill the short form and we will call you within one working day. Or speak to us now on "}
-            {!text &&
-              (hasRealPhone ? (
-                <a href={tel} className="font-semibold text-navy underline">
-                  {company.phone}
-                </a>
-              ) : (
-                <a href="#enquire" className="font-semibold text-navy underline">
-                  our enquiry form
-                </a>
-              ))}
-            {!text && "."}
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row md:justify-end">
-          <Link to="/apply" className={btn({ size: "lg" })}>
-            Apply Now
-          </Link>
-          <WhatsAppButton topic={topic} />
-        </div>
-      </div>
-    </section>
+    <Link to="/contact" className={btn({ variant, className })}>
+      {children ?? "Contact Us"}
+    </Link>
   );
 }

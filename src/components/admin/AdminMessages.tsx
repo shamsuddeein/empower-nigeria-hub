@@ -1,24 +1,36 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   listAdminMessagesFn,
   toggleMessageReadFn,
   deleteMessageFn,
 } from "@/server/functions/adminFunctions";
+import { AdminLoadingState, AdminErrorState, AdminEmptyState } from "./AdminStateFeedback";
 
 export function AdminMessages() {
   const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [topicFilter, setTopicFilter] = useState("all");
 
+  const requestIdRef = useRef(0);
+
   const fetchMessages = async () => {
-    setLoading(true);
+    const currentReq = ++requestIdRef.current;
+    setStatus("loading");
+    setErrorMessage(null);
     try {
       const data = await listAdminMessagesFn({ data: { topic: topicFilter } });
-      setMessages(data || []);
-    } catch (err) {
-      console.error("Error loading messages:", err);
-    } finally {
-      setLoading(false);
+      if (currentReq === requestIdRef.current) {
+        setMessages(data || []);
+        setStatus("success");
+      }
+    } catch (err: unknown) {
+      if (currentReq === requestIdRef.current) {
+        const msg = err instanceof Error ? err.message : "Failed to load messages from server.";
+        console.error("Error loading messages:", err);
+        setErrorMessage(msg);
+        setStatus("error");
+      }
     }
   };
 
@@ -31,18 +43,20 @@ export function AdminMessages() {
     try {
       await toggleMessageReadFn({ data: { id: msg.id, isRead: nextVal } });
       setMessages(messages.map((m) => (m.id === msg.id ? { ...m, is_read: nextVal } : m)));
-    } catch (err: any) {
-      alert("Failed to update status: " + err.message);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to update message status";
+      alert(errorMsg);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this message?")) return;
+    if (!confirm("Are you sure you want to delete this customer inquiry?")) return;
     try {
       await deleteMessageFn({ data: { id } });
       setMessages(messages.filter((m) => m.id !== id));
-    } catch (err: any) {
-      alert("Failed to delete message: " + err.message);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to delete message";
+      alert(errorMsg);
     }
   };
 
@@ -60,116 +74,123 @@ export function AdminMessages() {
           <button
             type="button"
             onClick={fetchMessages}
-            disabled={loading}
-            className="h-10 px-4 rounded-md border border-input bg-surface text-sm font-semibold text-navy hover:bg-sand transition-colors"
+            disabled={status === "loading"}
+            className="min-h-[44px] px-4 rounded-lg bg-navy text-sm font-semibold text-white hover:bg-navy/90 transition-colors disabled:opacity-50"
           >
-            {loading ? "Loading..." : "Refresh"}
+            {status === "loading" ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex items-center gap-3 bg-surface p-3 rounded-xl border border-border">
-        <label className="text-xs font-bold text-navy uppercase">Filter Topic:</label>
-        <select
-          value={topicFilter}
-          onChange={(e) => setTopicFilter(e.target.value)}
-          className="h-9 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-        >
-          <option value="all">All Topics</option>
-          <option value="solar">Solar for Business</option>
-          <option value="ev">Electric Vehicles</option>
-          <option value="phones">Phones & Gadgets</option>
-          <option value="land">Land & Estate</option>
-          <option value="finance">POS & Financial Services</option>
-          <option value="training">Vocational Training</option>
-          <option value="agent">Agent Network</option>
-          <option value="general">General Support</option>
-        </select>
+      {/* Filter Tabs */}
+      <div className="flex gap-2 border-b border-border pb-3 overflow-x-auto no-scrollbar">
+        {[
+          { id: "all", label: "All Topics" },
+          { id: "Solar", label: "Solar" },
+          { id: "Electric Vehicles", label: "Vehicles" },
+          { id: "Gadgets", label: "Gadgets" },
+          { id: "Land", label: "Land & Plots" },
+          { id: "Training", label: "Training" },
+          { id: "Agent", label: "Agent" },
+        ].map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={topicFilter === t.id}
+            onClick={() => setTopicFilter(t.id)}
+            className={`min-h-[44px] px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+              topicFilter === t.id
+                ? "bg-navy text-white shadow-xs"
+                : "border border-input bg-surface text-navy hover:bg-sand"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Messages List */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-sand/60 text-xs font-bold text-navy uppercase border-b border-border">
-              <tr>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Sender</th>
-                <th className="py-3 px-4">Contact</th>
-                <th className="py-3 px-4">Topic</th>
-                <th className="py-3 px-4">Message Content</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {messages.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                    {loading ? "Loading messages..." : "No messages found for this topic."}
-                  </td>
-                </tr>
-              ) : (
-                messages.map((m) => (
-                  <tr
-                    key={m.id}
-                    className={`hover:bg-sand/30 transition-colors ${
-                      !m.is_read ? "bg-amber-50/40 font-medium" : ""
-                    }`}
-                  >
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          !m.is_read
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {!m.is_read ? "Unread" : "Read"}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-navy">
-                      {m.name}
-                    </td>
-                    <td className="py-3 px-4 text-xs">
-                      <div>{m.phone}</div>
-                      <a href={`tel:${m.phone}`} className="text-navy font-semibold hover:underline">
-                        Call sender
-                      </a>
-                    </td>
-                    <td className="py-3 px-4 text-xs font-semibold capitalize text-navy">
-                      {m.topic}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-foreground max-w-sm whitespace-pre-wrap">
-                      {m.message}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(m.created_at).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-right space-x-2 whitespace-nowrap">
+      {status === "loading" && <AdminLoadingState message="Loading inquiries & messages..." />}
+
+      {status === "error" && (
+        <AdminErrorState
+          title="Unable to load customer messages"
+          message={errorMessage ?? "A server error occurred while retrieving message records."}
+          onRetry={fetchMessages}
+        />
+      )}
+
+      {status === "success" && (
+        <>
+          {messages.length === 0 ? (
+            <AdminEmptyState
+              title="No customer messages found"
+              description={
+                topicFilter === "all"
+                  ? "No customer inquiries have been submitted through the contact forms yet."
+                  : `No messages found under the topic "${topicFilter}".`
+              }
+            />
+          ) : (
+            <div className="space-y-4">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`p-5 rounded-xl border transition-colors shadow-xs ${
+                    m.is_read
+                      ? "bg-surface border-border opacity-85"
+                      : "bg-surface border-navy/40 shadow-sm"
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/60 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-bold text-base text-navy">{m.name}</h2>
+                        {!m.is_read && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-action text-navy">
+                            NEW
+                          </span>
+                        )}
+                        <span className="text-xs px-2.5 py-0.5 rounded-md bg-sand font-semibold text-navy">
+                          {m.topic}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
+                        <a href={`tel:${m.phone}`} className="font-semibold text-navy hover:underline">
+                          {m.phone}
+                        </a>
+                        <span>•</span>
+                        <span>{new Date(m.created_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 sm:pt-0">
                       <button
                         type="button"
                         onClick={() => handleToggleRead(m)}
-                        className="px-2.5 py-1 rounded-md border border-input text-xs font-semibold text-navy hover:bg-sand"
+                        className="min-h-[44px] px-3.5 rounded-lg border border-input text-xs font-semibold text-navy hover:bg-sand transition-colors"
                       >
-                        {m.is_read ? "Mark Unread" : "Mark Read"}
+                        {m.is_read ? "Mark Unread" : "Mark as Read"}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(m.id)}
-                        className="px-2.5 py-1 rounded-md border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                        className="min-h-[44px] px-3.5 rounded-lg border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
                       >
                         Delete
                       </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {m.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

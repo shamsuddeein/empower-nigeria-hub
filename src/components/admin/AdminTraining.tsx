@@ -8,12 +8,19 @@ import {
   updateCourseFn,
   deleteCourseFn,
 } from "@/server/functions/adminFunctions";
+import { AdminDialog } from "./AdminDialog";
+import {
+  AdminLoadingState,
+  AdminErrorState,
+  AdminEmptyState,
+} from "./AdminStateFeedback";
 
 export function AdminTraining() {
   const [activeTab, setActiveTab] = useState<"courses" | "signups">("courses");
   const [courses, setCourses] = useState<any[]>([]);
   const [signups, setSignups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Add / Edit Course Modal
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
@@ -29,7 +36,8 @@ export function AdminTraining() {
   const [formLearn, setFormLearn] = useState("");
 
   const fetchData = async () => {
-    setLoading(true);
+    setStatus("loading");
+    setErrorMessage(null);
     try {
       const [coursesData, signupsData] = await Promise.all([
         listAdminCoursesFn(),
@@ -37,10 +45,12 @@ export function AdminTraining() {
       ]);
       setCourses(coursesData || []);
       setSignups(signupsData || []);
-    } catch (err) {
+      setStatus("success");
+    } catch (err: unknown) {
       console.error("Error loading training data:", err);
-    } finally {
-      setLoading(false);
+      const msg = err instanceof Error ? err.message : "Failed to load vocational courses and signups.";
+      setErrorMessage(msg);
+      setStatus("error");
     }
   };
 
@@ -111,8 +121,9 @@ export function AdminTraining() {
 
       setEditingCourse(null);
       fetchData();
-    } catch (err: any) {
-      alert("Failed to save course: " + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save course";
+      alert("Failed to save course: " + msg);
     } finally {
       setSavingCourse(false);
     }
@@ -123,8 +134,9 @@ export function AdminTraining() {
     try {
       await updateCourseFn({ data: { id: c.id, active: nextVal } });
       setCourses(courses.map((item) => (item.id === c.id ? { ...item, active: nextVal } : item)));
-    } catch (err: any) {
-      alert("Failed to update status: " + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update status";
+      alert("Failed to update status: " + msg);
     }
   };
 
@@ -133,8 +145,9 @@ export function AdminTraining() {
     try {
       await deleteCourseFn({ data: { id } });
       setCourses(courses.filter((c) => c.id !== id));
-    } catch (err: any) {
-      alert("Failed to delete course: " + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete course";
+      alert("Failed to delete course: " + msg);
     }
   };
 
@@ -161,14 +174,13 @@ export function AdminTraining() {
     });
   };
 
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div>
-          <h1 className="text-2xl font-extrabold text-navy tracking-tight">Vocational Training & Capacity</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-extrabold text-navy tracking-tight">Vocational Training & Capacity</h1>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
             Manage solar and POS business training cohorts, syllabus modules, and trainee registrations.
           </p>
         </div>
@@ -177,7 +189,7 @@ export function AdminTraining() {
             <button
               type="button"
               onClick={openAddCourseModal}
-              className="h-10 px-4 rounded-md bg-navy text-sm font-semibold text-white hover:bg-navy/90 transition-colors"
+              className="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-lg bg-navy text-sm font-semibold text-white hover:bg-navy/90 transition-colors shadow-xs"
             >
               Add Course
             </button>
@@ -185,7 +197,7 @@ export function AdminTraining() {
             <button
               type="button"
               onClick={exportSignupsCSV}
-              className="h-10 px-4 rounded-md border border-input bg-surface text-sm font-semibold text-navy hover:bg-sand transition-colors"
+              className="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 rounded-lg border border-input bg-surface text-sm font-semibold text-navy hover:bg-sand transition-colors shadow-xs"
             >
               Export Signups CSV
             </button>
@@ -194,22 +206,26 @@ export function AdminTraining() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border" role="tablist" aria-label="Training modules">
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === "courses"}
           onClick={() => setActiveTab("courses")}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-colors ${
+          className={`min-h-[44px] py-3 px-5 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === "courses"
               ? "border-navy text-navy"
               : "border-transparent text-muted-foreground hover:text-navy"
           }`}
         >
-          Courses ({courses.length})
+          Courses Offered ({courses.length})
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === "signups"}
           onClick={() => setActiveTab("signups")}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-colors ${
+          className={`min-h-[44px] py-3 px-5 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === "signups"
               ? "border-navy text-navy"
               : "border-transparent text-muted-foreground hover:text-navy"
@@ -219,264 +235,402 @@ export function AdminTraining() {
         </button>
       </div>
 
-      {activeTab === "courses" ? (
-        /* Courses Table */
-        <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-sand/60 text-xs font-bold text-navy uppercase border-b border-border">
-                <tr>
-                  <th className="py-3 px-4">Course Title</th>
-                  <th className="py-3 px-4">Duration</th>
-                  <th className="py-3 px-4">Fee</th>
-                  <th className="py-3 px-4">Start Date</th>
-                  <th className="py-3 px-4">Seats Left</th>
-                  <th className="py-3 px-4">Publication</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {courses.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                      {loading ? "Loading courses..." : "No vocational courses registered."}
-                    </td>
-                  </tr>
-                ) : (
-                  courses.map((course) => (
-                    <tr key={course.id} className="hover:bg-sand/30 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-navy">
-                        {course.title}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        {course.duration}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-navy">
-                        {formatNaira(course.price)}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        {course.start_date ? new Date(course.start_date).toLocaleDateString() : "Rolling"}
-                      </td>
-                      <td className="py-3 px-4 text-xs font-semibold text-amber-800">
-                        {course.seats_left} seats
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleActive(course)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            course.active
-                              ? "bg-green-100 text-green-800 hover:bg-green-200"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                          }`}
-                        >
-                          {course.active ? "Active (Open)" : "Draft (Closed)"}
-                        </button>
-                      </td>
-                      <td className="py-3 px-4 text-right space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditCourseModal(course)}
-                          className="px-3 py-1.5 rounded-md border border-input text-xs font-semibold text-navy hover:bg-sand"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCourse(course.id, course.title)}
-                          className="px-3 py-1.5 rounded-md border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        /* Signups Table */
-        <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-sand/60 text-xs font-bold text-navy uppercase border-b border-border">
-                <tr>
-                  <th className="py-3 px-4">Trainee</th>
-                  <th className="py-3 px-4">Contact</th>
-                  <th className="py-3 px-4">State</th>
-                  <th className="py-3 px-4">Course</th>
-                  <th className="py-3 px-4">Education & Background</th>
-                  <th className="py-3 px-4 text-right">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {signups.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
-                      No training signups recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  signups.map((s) => (
-                    <tr key={s.id} className="hover:bg-sand/30 transition-colors">
-                      <td className="py-3 px-4 font-semibold text-navy">
-                        {s.full_name}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        <div>{s.phone}</div>
-                        <a href={`tel:${s.phone}`} className="text-navy font-semibold hover:underline">
-                          Call
-                        </a>
-                      </td>
-                      <td className="py-3 px-4 text-xs font-medium">
-                        {s.state}
-                      </td>
-                      <td className="py-3 px-4 text-xs font-semibold text-navy">
-                        {s.course_title}
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        <div>{s.education || "Not specified"}</div>
-                        <div className="text-muted-foreground">{s.experience || "No prior experience"}</div>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-right text-muted-foreground">
-                        {new Date(s.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* State Feedback */}
+      {status === "loading" && (
+        <AdminLoadingState message="Loading training cohorts and registrant roster..." />
       )}
 
-      {/* Add / Edit Course Modal */}
-      {editingCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-surface rounded-xl border border-border shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-6">
-            <div className="flex items-start justify-between pb-4 border-b border-border">
-              <div>
-                <h2 className="text-xl font-bold text-navy">
-                  {isNewCourse ? "Create Vocational Course" : `Edit Course: ${editingCourse.title}`}
-                </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Set program dates, available capacity, and curriculum focus points.
-                </p>
+      {status === "error" && (
+        <AdminErrorState
+          title="Could not load training data"
+          message={errorMessage ?? "An error occurred while communicating with the database."}
+          onRetry={fetchData}
+        />
+      )}
+
+      {status === "success" && activeTab === "courses" && (
+        <>
+          {courses.length === 0 ? (
+            <AdminEmptyState
+              title="No courses listed"
+              message="Add practical vocational courses such as Solar Installation or POS Business Operations."
+              actionLabel="Add Course"
+              onAction={openAddCourseModal}
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Mobile Card View (< 768px) */}
+              <div className="grid gap-3 md:hidden">
+                {courses.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-4 rounded-xl border border-border bg-surface shadow-xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-navy text-base">{c.title}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {c.duration} &bull; {c.seats_left} seats remaining
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(c)}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          c.active
+                            ? "bg-green-100 text-green-800"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {c.active ? "Open" : "Closed"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">Tuition Fee: </span>
+                        <strong className="text-navy font-bold">{formatNaira(c.price)}</strong>
+                      </div>
+                      {c.start_date && (
+                        <div>
+                          <span className="text-muted-foreground">Starts: </span>
+                          <span className="font-semibold text-navy">{c.start_date}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <button
+                        type="button"
+                        onClick={() => openEditCourseModal(c)}
+                        className="flex-1 min-h-[44px] px-3 py-2 rounded-lg border border-input text-xs font-semibold text-navy hover:bg-sand transition-colors"
+                      >
+                        Edit Course
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCourse(c.id, c.title)}
+                        className="min-h-[44px] px-4 py-2 rounded-lg border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingCourse(null)}
-                className="px-3 py-1.5 rounded-md border border-input text-xs font-semibold text-navy hover:bg-sand"
-              >
-                Close
-              </button>
+
+              {/* Desktop Table (>= 768px) */}
+              <div className="hidden md:block rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-sand/60 text-xs font-bold text-navy uppercase border-b border-border">
+                      <tr>
+                        <th className="py-3 px-4">Course Title</th>
+                        <th className="py-3 px-4">Duration</th>
+                        <th className="py-3 px-4">Tuition Fee</th>
+                        <th className="py-3 px-4">Next Cohort</th>
+                        <th className="py-3 px-4">Seats Left</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {courses.map((c) => (
+                        <tr key={c.id} className="hover:bg-sand/30 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-navy">
+                            {c.title}
+                          </td>
+                          <td className="py-3 px-4 text-xs">
+                            {c.duration || "Self-paced"}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-navy">
+                            {formatNaira(c.price)}
+                          </td>
+                          <td className="py-3 px-4 text-xs">
+                            {c.start_date || "Rolling admission"}
+                          </td>
+                          <td className="py-3 px-4 text-xs font-semibold">
+                            {c.seats_left}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleActive(c)}
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold transition-colors ${
+                                c.active
+                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                  : "bg-muted text-muted-foreground hover:bg-sand"
+                              }`}
+                            >
+                              {c.active ? "Open for Registration" : "Closed"}
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditCourseModal(c)}
+                              className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 rounded-md border border-input text-xs font-semibold text-navy hover:bg-sand transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCourse(c.id, c.title)}
+                              className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 rounded-md border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-
-            <form onSubmit={handleSaveCourse} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase mb-1">Course Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="e.g. Solar Installation & Inverter Sizing"
-                  className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-navy uppercase mb-1">Duration</label>
-                  <input
-                    type="text"
-                    value={formDuration}
-                    onChange={(e) => setFormDuration(e.target.value)}
-                    placeholder="4 weeks, Mon-Fri"
-                    className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy uppercase mb-1">Course Fee (NGN)</label>
-                  <input
-                    type="number"
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(Number(e.target.value))}
-                    placeholder="150000"
-                    className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-navy uppercase mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={formStartDate}
-                    onChange={(e) => setFormStartDate(e.target.value)}
-                    className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy uppercase mb-1">Seats Available</label>
-                  <input
-                    type="number"
-                    value={formSeatsLeft}
-                    onChange={(e) => setFormSeatsLeft(Number(e.target.value))}
-                    placeholder="15"
-                    className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-navy uppercase mb-1">
-                  What Trainees Learn (one item per line)
-                </label>
-                <textarea
-                  rows={4}
-                  value={formLearn}
-                  onChange={(e) => setFormLearn(e.target.value)}
-                  placeholder="Sizing a system for a shop or home&#10;Mounting panels safely on roofs&#10;Wiring inverters and lithium batteries&#10;Troubleshooting and diagnostics"
-                  className="w-full p-2.5 text-sm rounded-md border border-input bg-background focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer pt-1">
-                  <input
-                    type="checkbox"
-                    checked={formActive}
-                    onChange={(e) => setFormActive(e.target.checked)}
-                    className="rounded border-input text-navy focus:ring-navy"
-                  />
-                  <span className="text-sm font-semibold text-navy">Course is active and open for registration</span>
-                </label>
-              </div>
-
-              <div className="pt-4 border-t border-border flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingCourse(null)}
-                  className="px-4 py-2 rounded-md border border-input text-sm font-semibold text-navy hover:bg-sand"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingCourse}
-                  className="px-4 py-2 rounded-md bg-navy text-sm font-semibold text-white hover:bg-navy/90 disabled:opacity-50"
-                >
-                  {savingCourse ? "Saving..." : "Save Course"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          )}
+        </>
       )}
+
+      {status === "success" && activeTab === "signups" && (
+        <>
+          {signups.length === 0 ? (
+            <AdminEmptyState
+              title="No trainee registrations yet"
+              message="Prospective trainees submitting registrations through the public portal will appear in this cohort roster."
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Mobile Card View (< 768px) */}
+              <div className="grid gap-3 md:hidden">
+                {signups.map((s) => (
+                  <div
+                    key={s.id}
+                    className="p-4 rounded-xl border border-border bg-surface shadow-xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-navy text-base">{s.full_name}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {s.state} &bull; {s.course_title || "General Training"}
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {s.created_at ? new Date(s.created_at).toLocaleDateString() : ""}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1 bg-sand/30 p-2.5 rounded-lg border border-border/50">
+                      <div>
+                        <span className="font-semibold text-navy">Phone: </span>
+                        <span>{s.phone}</span>
+                      </div>
+                      {s.email && (
+                        <div>
+                          <span className="font-semibold text-navy">Email: </span>
+                          <span>{s.email}</span>
+                        </div>
+                      )}
+                      {s.experience && (
+                        <div>
+                          <span className="font-semibold text-navy">Background: </span>
+                          <span className="text-muted-foreground">{s.experience}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-border">
+                      <a
+                        href={`tel:${s.phone}`}
+                        className="w-full min-h-[44px] inline-flex items-center justify-center px-4 py-2 rounded-lg bg-navy text-xs font-semibold text-white hover:bg-navy/90"
+                      >
+                        Call Trainee ({s.phone})
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (>= 768px) */}
+              <div className="hidden md:block rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-sand/60 text-xs font-bold text-navy uppercase border-b border-border">
+                      <tr>
+                        <th className="py-3 px-4">Trainee Name</th>
+                        <th className="py-3 px-4">Phone</th>
+                        <th className="py-3 px-4">State</th>
+                        <th className="py-3 px-4">Selected Course</th>
+                        <th className="py-3 px-4">Background</th>
+                        <th className="py-3 px-4">Registered</th>
+                        <th className="py-3 px-4 text-right">Contact</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {signups.map((s) => (
+                        <tr key={s.id} className="hover:bg-sand/30 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-navy">
+                            {s.full_name}
+                          </td>
+                          <td className="py-3 px-4 text-xs font-medium">
+                            {s.phone}
+                          </td>
+                          <td className="py-3 px-4 text-xs">
+                            {s.state}
+                          </td>
+                          <td className="py-3 px-4 text-xs font-semibold text-navy">
+                            {s.course_title || "General"}
+                          </td>
+                          <td className="py-3 px-4 text-xs text-muted-foreground max-w-xs truncate">
+                            {s.experience || "No prior background specified"}
+                          </td>
+                          <td className="py-3 px-4 text-xs text-muted-foreground">
+                            {s.created_at ? new Date(s.created_at).toLocaleDateString() : "-"}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <a
+                              href={`tel:${s.phone}`}
+                              className="inline-flex items-center justify-center min-h-[36px] px-3 py-1.5 rounded-md border border-input text-xs font-semibold text-navy hover:bg-sand transition-colors"
+                            >
+                              Call
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Accessible Add / Edit Course Modal using AdminDialog */}
+      <AdminDialog
+        isOpen={Boolean(editingCourse)}
+        onClose={() => setEditingCourse(null)}
+        title={isNewCourse ? "Add Vocational Course" : `Edit Course: ${editingCourse?.title ?? ""}`}
+        subtitle="Manage course curriculum, tuition pricing, and enrollment capacity."
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSaveCourse} className="space-y-4">
+          <div>
+            <label htmlFor="courseFormTitle" className="block text-xs font-bold text-navy uppercase mb-1">
+              Course Title *
+            </label>
+            <input
+              id="courseFormTitle"
+              type="text"
+              required
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
+              placeholder="e.g. Solar Installation & Inverter Sizing"
+              className="w-full min-h-[44px] px-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="courseFormDuration" className="block text-xs font-bold text-navy uppercase mb-1">
+                Duration
+              </label>
+              <input
+                id="courseFormDuration"
+                type="text"
+                value={formDuration}
+                onChange={(e) => setFormDuration(e.target.value)}
+                placeholder="4 weeks, Mon-Fri"
+                className="w-full min-h-[44px] px-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+              />
+            </div>
+            <div>
+              <label htmlFor="courseFormPrice" className="block text-xs font-bold text-navy uppercase mb-1">
+                Course Fee (NGN)
+              </label>
+              <input
+                id="courseFormPrice"
+                type="number"
+                value={formPrice}
+                onChange={(e) => setFormPrice(Number(e.target.value))}
+                placeholder="150000"
+                className="w-full min-h-[44px] px-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="courseFormStartDate" className="block text-xs font-bold text-navy uppercase mb-1">
+                Start Date
+              </label>
+              <input
+                id="courseFormStartDate"
+                type="date"
+                value={formStartDate}
+                onChange={(e) => setFormStartDate(e.target.value)}
+                className="w-full min-h-[44px] px-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+              />
+            </div>
+            <div>
+              <label htmlFor="courseFormSeats" className="block text-xs font-bold text-navy uppercase mb-1">
+                Seats Available
+              </label>
+              <input
+                id="courseFormSeats"
+                type="number"
+                value={formSeatsLeft}
+                onChange={(e) => setFormSeatsLeft(Number(e.target.value))}
+                placeholder="15"
+                className="w-full min-h-[44px] px-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="courseFormLearn" className="block text-xs font-bold text-navy uppercase mb-1">
+              What Trainees Learn (one item per line)
+            </label>
+            <textarea
+              id="courseFormLearn"
+              rows={4}
+              value={formLearn}
+              onChange={(e) => setFormLearn(e.target.value)}
+              placeholder="Sizing a system for a shop or home&#10;Mounting panels safely on roofs&#10;Wiring inverters and lithium batteries&#10;Troubleshooting and diagnostics"
+              className="w-full p-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-navy/20"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer py-1">
+              <input
+                type="checkbox"
+                checked={formActive}
+                onChange={(e) => setFormActive(e.target.checked)}
+                className="size-4 rounded border-input text-navy focus:ring-navy"
+              />
+              <span className="text-sm font-semibold text-navy">Course is active and open for registration</span>
+            </label>
+          </div>
+
+          <div className="pt-4 border-t border-border flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setEditingCourse(null)}
+              className="min-h-[44px] px-5 py-2.5 rounded-lg border border-input text-sm font-semibold text-navy hover:bg-sand transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={savingCourse}
+              className="min-h-[44px] px-6 py-2.5 rounded-lg bg-navy text-sm font-semibold text-white hover:bg-navy/90 disabled:opacity-50 transition-colors shadow-xs"
+            >
+              {savingCourse ? "Saving..." : "Save Course"}
+            </button>
+          </div>
+        </form>
+      </AdminDialog>
     </div>
   );
 }

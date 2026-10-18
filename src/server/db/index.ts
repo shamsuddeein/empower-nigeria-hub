@@ -1,4 +1,4 @@
-import { construct as drizzle } from "drizzle-orm/libsql/driver-core";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 if (typeof process.loadEnvFile === "function") {

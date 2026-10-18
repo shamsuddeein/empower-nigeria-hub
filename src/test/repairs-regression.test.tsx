@@ -562,11 +562,15 @@ describe("Regression Suite: Repairs & Security Verification", () => {
           expect(container.textContent).toContain("Power your daily life and business.");
         });
 
-        // Hero WhatsApp button should point to #enquire when WhatsApp is placeholder, not wa.me/2348000000000
+        // Hero WhatsApp button should fallback to #enquire and accurate label ("Send an Enquiry" or "Contact Us") when WhatsApp is placeholder, not wa.me/2348000000000
         const heroButtons = Array.from(container.querySelectorAll("#hero a"));
-        const waButton = heroButtons.find((b) => b.textContent?.includes("WhatsApp"));
-        expect(waButton).toBeDefined();
-        expect(waButton?.getAttribute("href")).toBe("#enquire");
+        const fallbackContactButton = heroButtons.find(
+          (b) => b.textContent?.includes("Send an Enquiry") || b.textContent?.includes("Contact Us")
+        );
+        expect(fallbackContactButton).toBeDefined();
+        expect(fallbackContactButton?.getAttribute("href")).toBe("#enquire");
+        const waButton = heroButtons.find((b) => b.textContent?.includes("Chat on WhatsApp"));
+        expect(waButton).toBeUndefined();
 
         // No active tel: links pointing to placeholder numbers
         const telLinks = Array.from(container.querySelectorAll('a[href^="tel:"]'));

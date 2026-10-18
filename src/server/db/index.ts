@@ -1,5 +1,4 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { construct as drizzle } from "drizzle-orm/libsql/driver-core";
 import * as schema from "./schema";
 
 if (typeof process.loadEnvFile === "function") {
@@ -18,9 +17,23 @@ if (isProduction && !tursoUrl) {
   );
 }
 
-const dbUrl = tursoUrl || (process.env["VITEST"] ? ":memory:" : "file:local.db");
+const isTest = Boolean(process.env["VITEST"]);
+const dbUrl = isTest ? ":memory:" : (tursoUrl || "file:local.db");
 
-export const client = createClient({
+// Use @libsql/client/web for remote Turso connections (HTTP/HTTPS/libsql) to avoid native C/C++ cross-platform binary dependencies on Vercel.
+// For local testing (:memory:) or local file development, fall back to @libsql/client.
+let createLibsqlClient: typeof import("@libsql/client/web").createClient;
+
+if (!isTest && (tursoUrl || dbUrl.startsWith("libsql:") || dbUrl.startsWith("https:") || dbUrl.startsWith("http:"))) {
+  const webClientModule = await import("@libsql/client/web");
+  createLibsqlClient = webClientModule.createClient;
+} else {
+  const nodeMod = "@libsql/client";
+  const nodeClientModule = await import(/* @vite-ignore */ nodeMod);
+  createLibsqlClient = nodeClientModule.createClient;
+}
+
+export const client = createLibsqlClient({
   url: dbUrl,
   ...(tursoAuthToken ? { authToken: tursoAuthToken } : {}),
 });

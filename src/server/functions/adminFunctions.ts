@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq, desc, asc, sql } from "drizzle-orm";
+import { eq, desc, asc, sql, and } from "drizzle-orm";
 import { db } from "../db/index";
 import * as schema from "../db/schema";
 import { requireAdminSession } from "../auth/session";
@@ -549,20 +549,42 @@ export const deleteAgentFn = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 
 export const listAdminApplicationsFn = createServerFn({ method: "GET" })
-  .validator((status?: unknown) => status as string | undefined)
-  .handler(async ({ data: statusFilter }) => {
+  .validator((input?: unknown) => {
+    if (typeof input === "string") {
+      return { status: input, category: undefined };
+    }
+    if (input && typeof input === "object") {
+      const obj = input as { status?: string; category?: string };
+      return {
+        status: obj.status,
+        category: obj.category,
+      };
+    }
+    return { status: undefined, category: undefined };
+  })
+  .handler(async ({ data }) => {
     await requireAdminSession();
 
+    const conditions = [];
+    if (data?.status && data.status !== "all") {
+      conditions.push(eq(schema.applications.status, data.status));
+    }
+    if (data?.category && data.category !== "all") {
+      conditions.push(eq(schema.applications.category, data.category));
+    }
+
     let query = db.select().from(schema.applications);
-    if (statusFilter && statusFilter !== "all") {
-      query = query.where(eq(schema.applications.status, statusFilter)) as typeof query;
+    if (conditions.length === 1) {
+      query = query.where(conditions[0]) as typeof query;
+    } else if (conditions.length > 1) {
+      query = query.where(and(...conditions)) as typeof query;
     }
 
     const rows = await query.orderBy(desc(schema.applications.created_at));
     return rows.map((r) => {
       let plan = {};
       try {
-        plan = JSON.parse(r.plan_snapshot);
+        plan = r.plan_snapshot ? JSON.parse(r.plan_snapshot) : {};
       } catch {
         plan = {};
       }

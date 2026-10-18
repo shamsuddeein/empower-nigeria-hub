@@ -19,6 +19,33 @@ export function AdminApplications() {
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [notes, setNotes] = useState("");
+  const [statusConfirm, setStatusConfirm] = useState<{
+    applicantName: string;
+    reference: string;
+    currentStatus: string;
+    proposedStatus: "New" | "Contacted" | "Approved" | "Rejected" | "Completed";
+  } | null>(null);
+  const [inspectorFeedback, setInspectorFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const [draftNotesByAppId, setDraftNotesByAppId] = useState<Record<string, string>>({});
+  const selectedAppIdRef = useRef<string | null>(null);
+  const cancelConfirmBtnRef = useRef<HTMLButtonElement | null>(null);
+  const triggerActionBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    selectedAppIdRef.current = selectedApp ? selectedApp.id : null;
+  }, [selectedApp]);
+
+  useEffect(() => {
+    if (!statusConfirm) return undefined;
+    const timer = setTimeout(() => {
+      cancelConfirmBtnRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [statusConfirm]);
 
   const requestIdRef = useRef(0);
 
@@ -52,37 +79,104 @@ export function AdminApplications() {
   }, [statusFilter, categoryFilter]);
 
   const handleOpenInspector = (app: any) => {
+    selectedAppIdRef.current = app.id;
     setSelectedApp(app);
-    setNotes(app.notes || "");
+    const existingDraft = draftNotesByAppId[app.id] ?? (app.notes || "");
+    setNotes(existingDraft);
+    setStatusConfirm(null);
+    setInspectorFeedback(null);
   };
 
-  const handleUpdateStatus = async (newStatus: string) => {
-    if (!selectedApp) return;
+  const handleNotesChange = (val: string) => {
+    setNotes(val);
+    if (selectedApp) {
+      setDraftNotesByAppId((prev) => ({ ...prev, [selectedApp.id]: val }));
+    }
+  };
+
+  const lastActionStatusRef = useRef<string | null>(null);
+
+  const requestStatusChange = (
+    newStatus: "New" | "Contacted" | "Approved" | "Rejected" | "Completed",
+    e?: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    if (!selectedApp || selectedApp.status === newStatus) return;
+    lastActionStatusRef.current = newStatus;
+    if (e?.currentTarget) {
+      triggerActionBtnRef.current = e.currentTarget;
+    }
+    setInspectorFeedback(null);
+    setStatusConfirm({
+      applicantName: selectedApp.full_name,
+      reference: selectedApp.reference,
+      currentStatus: selectedApp.status,
+      proposedStatus: newStatus,
+    });
+  };
+
+  const cancelStatusChange = () => {
+    const actionToRestore = lastActionStatusRef.current;
+    setStatusConfirm(null);
+    setTimeout(() => {
+      if (triggerActionBtnRef.current && triggerActionBtnRef.current.isConnected) {
+        triggerActionBtnRef.current.focus();
+      } else if (actionToRestore) {
+        const btn = document.querySelector<HTMLButtonElement>(`button[data-status-action="${actionToRestore}"]`);
+        btn?.focus();
+      }
+    }, 15);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!selectedApp || !statusConfirm) return;
+    const targetAppId = selectedApp.id;
+    const targetRef = selectedApp.reference;
+    const targetStatus = statusConfirm.proposedStatus;
+    const prevStatus = selectedApp.status;
+    const appAtStart = selectedApp;
+    const notesToSend = draftNotesByAppId[targetAppId] ?? notes;
+
     setUpdatingStatus(true);
+    setInspectorFeedback(null);
     try {
+      // Single atomic update for status and changed notes
+      const notesToUpdate = notesToSend !== appAtStart.notes ? notesToSend : undefined;
       await updateApplicationStatusFn({
         data: {
-          id: selectedApp.id,
-          status: newStatus,
+          id: targetAppId,
+          status: targetStatus,
+          notes: notesToUpdate,
         },
       });
 
-      if (notes !== selectedApp.notes) {
-        await updateApplicationNotesFn({
-          data: {
-            id: selectedApp.id,
-            notes,
-          },
+      const updated = { ...appAtStart, status: targetStatus, notes: notesToSend };
+
+      // Keep active filtered queue synchronized: a rejected record must not remain under New filter
+      setApplications((prev) => {
+        if (statusFilter !== "all" && statusFilter !== targetStatus) {
+          return prev.filter((a) => a.id !== targetAppId);
+        }
+        return prev.map((a) => (a.id === targetAppId ? updated : a));
+      });
+
+      // ONLY update the inspector if the open inspector is STILL targetAppId
+      if (selectedAppIdRef.current === targetAppId) {
+        setSelectedApp(updated);
+        setStatusConfirm(null);
+        setInspectorFeedback({
+          type: "success",
+          text: `Application ${targetRef} status updated from "${prevStatus}" to "${targetStatus}".`,
         });
       }
-
-      setSelectedApp({ ...selectedApp, status: newStatus, notes });
-      setApplications((prev) =>
-        prev.map((a) => (a.id === selectedApp.id ? { ...a, status: newStatus, notes } : a))
-      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      alert("Failed to update status: " + msg);
+      // ONLY update inspector feedback if the open inspector is STILL targetAppId
+      if (selectedAppIdRef.current === targetAppId) {
+        setInspectorFeedback({
+          type: "error",
+          text: `Failed to update status: ${msg}. Current status remains "${prevStatus}".`,
+        });
+      }
     } finally {
       setUpdatingStatus(false);
     }
@@ -90,26 +184,46 @@ export function AdminApplications() {
 
   const handleSaveNotes = async () => {
     if (!selectedApp) return;
+    const targetAppId = selectedApp.id;
+    const appAtStart = selectedApp;
+    const notesToSend = draftNotesByAppId[targetAppId] ?? notes;
+
     setUpdatingStatus(true);
+    setInspectorFeedback(null);
     try {
       await updateApplicationNotesFn({
         data: {
-          id: selectedApp.id,
-          notes,
+          id: targetAppId,
+          notes: notesToSend,
         },
       });
-      setSelectedApp({ ...selectedApp, notes });
+
+      const updated = { ...appAtStart, notes: notesToSend };
       setApplications((prev) =>
-        prev.map((a) => (a.id === selectedApp.id ? { ...a, notes } : a))
+        prev.map((a) => (a.id === targetAppId ? updated : a))
       );
-      alert("Staff notes saved.");
+
+      // ONLY update the inspector if the open inspector is STILL targetAppId
+      if (selectedAppIdRef.current === targetAppId) {
+        setSelectedApp(updated);
+        setInspectorFeedback({
+          type: "success",
+          text: "Staff notes saved successfully.",
+        });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save notes";
-      alert("Failed to save notes: " + msg);
+      if (selectedAppIdRef.current === targetAppId) {
+        setInspectorFeedback({
+          type: "error",
+          text: msg,
+        });
+      }
     } finally {
       setUpdatingStatus(false);
     }
   };
+
 
   const filteredApps = applications.filter((a) => {
     if (!search.trim()) return true;
@@ -460,26 +574,64 @@ export function AdminApplications() {
               </div>
             </div>
 
-            {/* Product & Terms Breakdown */}
+            {/* Authoritative Stored Financing Terms Breakdown */}
             <div className="border border-border rounded-xl p-4 space-y-3 bg-surface">
-              <h3 className="font-bold text-navy text-sm uppercase">Selected Product & Financing Breakdown</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <h3 className="font-bold text-navy text-sm uppercase">Authoritative Stored Financing Terms</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-sm">
                 <div>
                   <span className="text-xs text-muted-foreground block">Product</span>
-                  <span className="font-bold text-navy">{selectedApp.product_name}</span>
+                  <span className="font-bold text-navy truncate block">{selectedApp.product_name}</span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block">Cash Price</span>
                   <span className="font-semibold">{formatNaira(selectedApp.price)}</span>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground block">Duration</span>
+                  <span className="text-xs text-muted-foreground block">Upfront Deposit</span>
+                  <span className="font-semibold">{formatNaira(selectedApp.deposit || 0)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Upfront Charges</span>
+                  <span className="font-semibold">{formatNaira(selectedApp.charges || 0)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Payment Duration</span>
                   <span className="font-semibold">{selectedApp.duration} Months</span>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground block">Installment</span>
+                  <span className="text-xs text-muted-foreground block">Payment Frequency</span>
+                  <span className="font-semibold capitalize">{selectedApp.frequency}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Payment Count</span>
+                  <span className="font-semibold">
+                    {selectedApp.payment_count ||
+                      selectedApp.plan?.payments ||
+                      Math.round(selectedApp.frequency === "weekly" ? (selectedApp.duration * 52) / 12 : selectedApp.duration)}{" "}
+                    Payments
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Regular Payment</span>
                   <span className="font-extrabold text-green-700">
-                    {selectedApp.payment_amount ? formatNaira(selectedApp.payment_amount) : "Calculated"} / {selectedApp.frequency}
+                    {formatNaira(selectedApp.payment_amount || selectedApp.plan?.perPayment || 0)} / {selectedApp.frequency}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Adjusted Final Payment</span>
+                  <span className="font-semibold text-navy">
+                    {formatNaira(
+                      selectedApp.final_payment_amount ||
+                        selectedApp.plan?.finalPayment ||
+                        selectedApp.payment_amount ||
+                        0
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block">Total Repayable</span>
+                  <span className="font-bold text-navy">
+                    {formatNaira(selectedApp.total_amount || selectedApp.plan?.total || 0)}
                   </span>
                 </div>
               </div>
@@ -494,7 +646,7 @@ export function AdminApplications() {
                 id="inspector-staff-notes"
                 rows={3}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => handleNotesChange(e.target.value)}
                 placeholder="Add verification notes, guarantor check findings, or contact outcomes..."
                 className="w-full p-3 text-base sm:text-sm rounded-lg border border-input bg-background focus:border-navy focus:ring-2 focus:ring-navy/20 focus:outline-none"
               />
@@ -510,46 +662,157 @@ export function AdminApplications() {
               </div>
             </div>
 
-            {/* Status Workflow Action Buttons */}
-            <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="text-sm text-muted-foreground">
-                Current status: <strong className="text-navy font-bold">{selectedApp.status}</strong>
-              </div>
-              <div className="flex flex-wrap gap-2">
+            {/* Inline Feedback Notification */}
+            {inspectorFeedback && (
+              <div
+                role="status"
+                className={`p-3 rounded-lg text-xs font-semibold flex items-center justify-between ${
+                  inspectorFeedback.type === "success"
+                    ? "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                <span>{inspectorFeedback.text}</span>
                 <button
                   type="button"
-                  onClick={() => handleUpdateStatus("Contacted")}
-                  disabled={updatingStatus}
-                  className="min-h-[44px] px-3.5 rounded-lg border border-input text-xs font-semibold text-navy hover:bg-sand transition-colors disabled:opacity-50"
+                  onClick={() => setInspectorFeedback(null)}
+                  className="text-xs font-bold hover:underline ml-4"
                 >
-                  Mark Contacted
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus("Approved")}
-                  disabled={updatingStatus}
-                  className="min-h-[44px] px-3.5 rounded-lg bg-green-700 text-xs font-semibold text-white hover:bg-green-800 transition-colors disabled:opacity-50"
-                >
-                  Approve Application
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus("Rejected")}
-                  disabled={updatingStatus}
-                  className="min-h-[44px] px-3.5 rounded-lg bg-destructive text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
-                >
-                  Reject Application
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUpdateStatus("Completed")}
-                  disabled={updatingStatus}
-                  className="min-h-[44px] px-3.5 rounded-lg bg-navy text-xs font-semibold text-white hover:bg-navy/90 transition-colors disabled:opacity-50"
-                >
-                  Mark Completed
+                  Dismiss
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* Status Change Confirmation Panel */}
+            {statusConfirm ? (
+              <div
+                role="alertdialog"
+                aria-modal="false"
+                tabIndex={-1}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    cancelStatusChange();
+                  }
+                }}
+                aria-labelledby="confirm-status-title"
+                aria-describedby="confirm-status-desc"
+                className="p-4 rounded-xl border-2 border-action bg-action-soft space-y-3 animate-in fade-in duration-150 outline-none"
+              >
+                <div className="flex items-center justify-between">
+                  <h4 id="confirm-status-title" className="font-bold text-sm text-navy uppercase">
+                    Confirm Status Change
+                  </h4>
+                  <span className="text-xs font-mono font-bold text-navy">
+                    {statusConfirm.reference}
+                  </span>
+                </div>
+                <p id="confirm-status-desc" className="text-xs sm:text-sm text-foreground">
+                  Are you sure you want to change the status for{" "}
+                  <strong className="text-navy">{statusConfirm.applicantName}</strong> from{" "}
+                  <span className="font-semibold underline">{statusConfirm.currentStatus}</span> to{" "}
+                  <strong className="text-navy">{statusConfirm.proposedStatus}</strong>?
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    ref={cancelConfirmBtnRef}
+                    type="button"
+                    onClick={cancelStatusChange}
+                    disabled={updatingStatus}
+                    className="min-h-[44px] px-4 rounded-lg border border-input bg-surface text-xs font-semibold text-navy hover:bg-sand transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmStatusChange}
+                    disabled={updatingStatus}
+                    className={`min-h-[44px] px-4 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-50 ${
+                      statusConfirm.proposedStatus === "Approved"
+                        ? "bg-green-700 hover:bg-green-800"
+                        : statusConfirm.proposedStatus === "Rejected"
+                        ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                        : "bg-navy hover:bg-navy/90"
+                    }`}
+                  >
+                    {updatingStatus ? "Updating..." : `Confirm ${statusConfirm.proposedStatus}`}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Status Workflow Action Buttons */
+              <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-sm text-muted-foreground">
+                  Current status: <strong className="text-navy font-bold">{selectedApp.status}</strong>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* Correction / Reopen path to New */}
+                  {selectedApp.status !== "New" && (
+                    <button
+                      type="button"
+                      data-status-action="New"
+                      onClick={(e) => requestStatusChange("New", e)}
+                      disabled={updatingStatus}
+                      className="min-h-[44px] px-3.5 rounded-lg border border-amber-300 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                    >
+                      Return to New
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-status-action="Contacted"
+                    onClick={(e) => requestStatusChange("Contacted", e)}
+                    disabled={updatingStatus || selectedApp.status === "Contacted"}
+                    className={`min-h-[44px] px-3.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      selectedApp.status === "Contacted"
+                        ? "bg-blue-50 border-blue-200 text-blue-800 cursor-default"
+                        : "border-input text-navy hover:bg-sand"
+                    }`}
+                  >
+                    {selectedApp.status === "Contacted" ? "✓ Contacted" : "Mark Contacted"}
+                  </button>
+                  <button
+                    type="button"
+                    data-status-action="Approved"
+                    onClick={(e) => requestStatusChange("Approved", e)}
+                    disabled={updatingStatus || selectedApp.status === "Approved"}
+                    className={`min-h-[44px] px-3.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      selectedApp.status === "Approved"
+                        ? "bg-green-100 border border-green-300 text-green-800 cursor-default"
+                        : "bg-green-700 text-white hover:bg-green-800"
+                    }`}
+                  >
+                    {selectedApp.status === "Approved" ? "✓ Approved" : "Approve Application"}
+                  </button>
+                  <button
+                    type="button"
+                    data-status-action="Rejected"
+                    onClick={(e) => requestStatusChange("Rejected", e)}
+                    disabled={updatingStatus || selectedApp.status === "Rejected"}
+                    className={`min-h-[44px] px-3.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      selectedApp.status === "Rejected"
+                        ? "bg-red-100 border border-red-300 text-red-800 cursor-default"
+                        : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    }`}
+                  >
+                    {selectedApp.status === "Rejected" ? "✓ Rejected" : "Reject Application"}
+                  </button>
+                  <button
+                    type="button"
+                    data-status-action="Completed"
+                    onClick={(e) => requestStatusChange("Completed", e)}
+                    disabled={updatingStatus || selectedApp.status === "Completed"}
+                    className={`min-h-[44px] px-3.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      selectedApp.status === "Completed"
+                        ? "bg-navy/10 border border-navy/20 text-navy cursor-default"
+                        : "bg-navy text-white hover:bg-navy/90"
+                    }`}
+                  >
+                    {selectedApp.status === "Completed" ? "✓ Completed" : "Mark Completed"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </AdminDialog>

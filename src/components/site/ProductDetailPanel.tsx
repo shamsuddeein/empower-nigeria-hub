@@ -33,12 +33,15 @@ export function ProductDetailPanel({
   const [duration, setDuration] = useState<number>(6);
   const [frequency, setFrequency] = useState<Frequency>("weekly");
 
+  const [imgFailed, setImgFailed] = useState<boolean>(false);
+
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!product) return;
+    setImgFailed(false);
 
     returnFocusRef.current = document.activeElement as HTMLElement;
     const originalOverflow = document.body.style.overflow;
@@ -133,13 +136,14 @@ export function ProductDetailPanel({
 
         {/* Scrollable Body: Always reachable on mobile & landscape screens */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-          {product.images && product.images.length > 0 && product.images[0] ? (
+          {product.images && product.images.length > 0 && product.images[0] && !imgFailed ? (
             <img
               src={product.images[0]}
               alt={product.name}
               className="aspect-[16/10] w-full rounded-lg object-cover border border-border"
               loading="lazy"
               decoding="async"
+              onError={() => setImgFailed(true)}
             />
           ) : (
             <ProductImagePlaceholder
@@ -165,8 +169,8 @@ export function ProductDetailPanel({
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <span className="block text-xs font-semibold text-navy">Select Tenor</span>
-                <div className="mt-1.5 flex gap-1.5">
+                <span className="block text-xs font-semibold text-navy">Payment duration</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                   {[3, 6, 9, 12].map((m) => (
                     <button
                       key={m}
@@ -179,7 +183,7 @@ export function ProductDetailPanel({
                           : "border-input bg-surface text-foreground hover:bg-accent"
                       )}
                     >
-                      {m}m
+                      {m} months
                     </button>
                   ))}
                 </div>
@@ -214,9 +218,18 @@ export function ProductDetailPanel({
                 </span>
                 <span className="text-2xl font-bold">{naira(plan.perPayment)}</span>
               </div>
-              <div className="mt-2 flex justify-between text-xs text-navy-muted">
-                <span>{plan.payments} total installments</span>
-                <span>Total repayable: {naira(plan.total)}</span>
+              <div className="mt-2 text-xs text-navy-muted space-y-1">
+                {plan.hasDifferentFinalPayment ? (
+                  <p>
+                    {plan.payments - 1} payments of {naira(plan.perPayment)} + 1 final payment of {naira(plan.finalPayment)}
+                  </p>
+                ) : (
+                  <p>{plan.payments} total installments of {naira(plan.perPayment)}</p>
+                )}
+                <div className="flex justify-between font-semibold pt-1 border-t border-navy-muted/20">
+                  <span>Total repayable:</span>
+                  <span className="text-navy-foreground">{naira(plan.total)}</span>
+                </div>
               </div>
             </div>
           </div>

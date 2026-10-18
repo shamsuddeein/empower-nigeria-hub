@@ -104,8 +104,8 @@ export function calculatePlan({
   upfrontCharges = 0,
   markups = defaultMarkups,
 }: PlanInput): PlanResult {
-  if (!Number.isFinite(price) || price < 0) {
-    throw new Error(`Invalid price: ${price}. Price must be a non-negative finite number.`);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`Invalid price: ${price}. Price must be a positive finite number.`);
   }
   if (!Number.isFinite(months) || months <= 0) {
     throw new Error(`Invalid duration: ${months}. Duration must be positive.`);
@@ -122,8 +122,8 @@ export function calculatePlan({
   const d = Math.round(deposit);
   const u = Math.round(upfrontCharges);
 
-  if (d > p) {
-    throw new Error(`Deposit (₦${d.toLocaleString()}) cannot exceed cash price (₦${p.toLocaleString()}).`);
+  if (d >= p) {
+    throw new Error(`Deposit (₦${d.toLocaleString()}) cannot exceed or equal cash price (₦${p.toLocaleString()}).`);
   }
 
   // Integer kobo calculations

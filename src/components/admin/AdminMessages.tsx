@@ -4,6 +4,7 @@ import {
   toggleMessageReadFn,
   deleteMessageFn,
 } from "@/server/functions/adminFunctions";
+import { ENQUIRY_TOPICS } from "@/lib/taxonomy";
 import { AdminLoadingState, AdminErrorState, AdminEmptyState } from "./AdminStateFeedback";
 
 export function AdminMessages() {
@@ -11,6 +12,8 @@ export function AdminMessages() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [topicFilter, setTopicFilter] = useState("all");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const requestIdRef = useRef(0);
 
@@ -43,20 +46,26 @@ export function AdminMessages() {
     try {
       await toggleMessageReadFn({ data: { id: msg.id, isRead: nextVal } });
       setMessages(messages.map((m) => (m.id === msg.id ? { ...m, is_read: nextVal } : m)));
+      setFeedback({ type: "success", text: nextVal ? "Message marked as read." : "Message marked as unread." });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to update message status";
-      alert(errorMsg);
+      setFeedback({ type: "error", text: errorMsg });
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (deletingId) return;
     if (!confirm("Are you sure you want to delete this customer inquiry?")) return;
+    setDeletingId(id);
     try {
       await deleteMessageFn({ data: { id } });
-      setMessages(messages.filter((m) => m.id !== id));
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+      setFeedback({ type: "success", text: "Customer inquiry deleted successfully." });
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to delete message";
-      alert(errorMsg);
+      setFeedback({ type: "error", text: errorMsg });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -82,16 +91,31 @@ export function AdminMessages() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {feedback && (
+        <div
+          role="status"
+          className={`p-3 rounded-lg text-xs font-semibold flex items-center justify-between ${
+            feedback.type === "success"
+              ? "bg-green-50 text-green-800 border border-green-200"
+              : "bg-red-50 text-red-800 border border-red-200"
+          }`}
+        >
+          <span>{feedback.text}</span>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="text-xs font-bold hover:underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Filter Tabs using canonical topics and labels */}
       <div className="flex gap-2 border-b border-border pb-3 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "All Topics" },
-          { id: "Solar", label: "Solar" },
-          { id: "Electric Vehicles", label: "Vehicles" },
-          { id: "Gadgets", label: "Gadgets" },
-          { id: "Land", label: "Land & Plots" },
-          { id: "Training", label: "Training" },
-          { id: "Agent", label: "Agent" },
+          ...ENQUIRY_TOPICS.map((t) => ({ id: t.id, label: t.label })),
         ].map((t) => (
           <button
             key={t.id}
@@ -175,9 +199,10 @@ export function AdminMessages() {
                       <button
                         type="button"
                         onClick={() => handleDelete(m.id)}
-                        className="min-h-[44px] px-3.5 rounded-lg border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                        disabled={deletingId === m.id}
+                        className="min-h-[44px] px-3.5 rounded-lg border border-destructive/30 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
                       >
-                        Delete
+                        {deletingId === m.id ? "Deleting..." : "Delete"}
                       </button>
                     </div>
                   </div>

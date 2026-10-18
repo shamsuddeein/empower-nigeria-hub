@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useId } from "react";
+import { useState, useId, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useCompany,
@@ -38,6 +38,7 @@ import {
   PlotImagePlaceholder,
 } from "@/components/site/DevelopmentPlaceholders";
 import { cn } from "@/lib/utils";
+import { matchesProductCategory } from "@/lib/taxonomy";
 
 function isDirectVideo(url: string | null | undefined): boolean {
   if (!url) return false;
@@ -57,6 +58,64 @@ export const Route = createFileRoute("/")({
   },
   component: PublicLandingPage,
 });
+
+function parseNairaInput(raw: string): { value: number; error: string | null; isEmpty: boolean } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { value: 0, error: null, isEmpty: true };
+  }
+  if (trimmed.startsWith("-") || trimmed.includes("-")) {
+    return { value: -1, error: "Cash price and deposit must be positive numbers.", isEmpty: false };
+  }
+  const cleaned = trimmed.replace(/,/g, "");
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) {
+    return { value: NaN, error: "Please enter a valid numeric amount.", isEmpty: false };
+  }
+  const num = Number(cleaned);
+  if (!Number.isFinite(num)) {
+    return { value: NaN, error: "Please enter a valid numeric amount.", isEmpty: false };
+  }
+  return { value: num, error: null, isEmpty: false };
+}
+
+function CatalogueCardImage({
+  src,
+  alt,
+  category,
+  productName,
+}: {
+  src?: string | undefined;
+  alt: string;
+  category?: string | undefined;
+  productName: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return (
+      <ProductImagePlaceholder
+        category={category}
+        productName={productName}
+        className="mt-3 mb-2"
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="mt-3 mb-2 aspect-[16/10] w-full rounded-lg object-cover border border-border"
+      loading="lazy"
+      decoding="async"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 export function PublicLandingPage() {
   const { company, tel, wa, hasRealPhone, hasRealWhatsApp } = useCompany();
@@ -86,17 +145,58 @@ export function PublicLandingPage() {
   const evMonthlySavings = Math.max(0, evMonthlyPetrol - evMonthlyElectric);
 
   // General Installment Calculator State
-  const [calcPrice, setCalcPrice] = useState<number>(850000);
+  const [calcPriceRaw, setCalcPriceRaw] = useState<string>("850,000");
+  const [calcDepositRaw, setCalcDepositRaw] = useState<string>("");
   const [calcDuration, setCalcDuration] = useState<number>(6);
   const [calcFrequency, setCalcFrequency] = useState<Frequency>("weekly");
-  const [calcDeposit, setCalcDeposit] = useState<number>(0);
-  const planResult = calculatePlan({
-    price: calcPrice,
-    months: calcDuration,
-    frequency: calcFrequency,
-    deposit: calcDeposit,
-    markups,
-  });
+  const [calcError, setCalcError] = useState<string | null>(null);
+
+  const parsedPrice = parseNairaInput(calcPriceRaw);
+  const parsedDeposit = parseNairaInput(calcDepositRaw);
+
+  const priceVal = parsedPrice.value;
+  const depositVal = parsedDeposit.value;
+
+  let inlinePriceError: string | null = null;
+  if (parsedPrice.error) {
+    inlinePriceError = parsedPrice.error;
+  } else if (parsedPrice.isEmpty) {
+    inlinePriceError = "Please enter equipment cash price.";
+  } else if (priceVal <= 0) {
+    inlinePriceError = "Equipment cash price must be greater than zero.";
+  }
+
+  let inlineDepositError: string | null = null;
+  if (parsedDeposit.error) {
+    inlineDepositError = parsedDeposit.error;
+  } else if (depositVal < 0) {
+    inlineDepositError = "Deposit cannot be negative.";
+  } else if (priceVal > 0 && depositVal >= priceVal) {
+    inlineDepositError = "Deposit must be less than the cash price.";
+  }
+
+  let planResult: ReturnType<typeof calculatePlan> | null = null;
+  if (
+    priceVal > 0 &&
+    Number.isFinite(priceVal) &&
+    depositVal >= 0 &&
+    Number.isFinite(depositVal) &&
+    depositVal < priceVal &&
+    !parsedPrice.error &&
+    !parsedDeposit.error
+  ) {
+    try {
+      planResult = calculatePlan({
+        price: priceVal,
+        months: calcDuration,
+        frequency: calcFrequency,
+        deposit: depositVal,
+        markups,
+      });
+    } catch {
+      planResult = null;
+    }
+  }
 
   // Benchmark Installment Calculations for Curated Preview Cards
   const planSolarCompact = calculatePlan({
@@ -150,6 +250,7 @@ export function PublicLandingPage() {
   const [trainState, setTrainState] = useState<string>("Kaduna");
   const [trainSubmitting, setTrainSubmitting] = useState<boolean>(false);
   const [trainSubmitted, setTrainSubmitted] = useState<boolean>(false);
+  const [submittedCourseTitle, setSubmittedCourseTitle] = useState<string>("");
   const [trainError, setTrainError] = useState<string | null>(null);
 
   // Agent Application Form State
@@ -235,7 +336,7 @@ export function PublicLandingPage() {
   const gadgetProducts = (allProducts ?? []).filter((p) => {
     if (p.category === "solar" || p.category === "ev") return false;
     if (gadgetFilter === "all") return true;
-    return p.category === gadgetFilter;
+    return matchesProductCategory(p.category, gadgetFilter);
   });
 
   const openApplyForProduct = (
@@ -316,17 +417,19 @@ export function PublicLandingPage() {
       return;
     }
 
+    const targetTitle = effectiveCourseTitle;
     setTrainSubmitting(true);
     try {
       await submitTrainingSignupFn({
         data: {
           courseId: selectedCourse?.id ?? (effectiveCourseId || null),
-          courseTitle: effectiveCourseTitle,
+          courseTitle: targetTitle,
           fullName: trainFullName.trim(),
           phone: cleanPhone,
           state: trainState,
         },
       });
+      setSubmittedCourseTitle(targetTitle);
       setTrainSubmitted(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Could not record training registration.";
@@ -1018,7 +1121,7 @@ export function PublicLandingPage() {
 
           <div className="mt-12 grid gap-10 lg:grid-cols-[1.2fr_1fr]">
             {/* Fuel vs Electric Running Cost Calculator */}
-            <div className="rounded-xl border border-border bg-background p-6 md:p-8">
+            <div id="ev-calculator" className="rounded-xl border border-border bg-background p-6 md:p-8">
               <span className="text-xs font-bold uppercase tracking-wider text-action">
                 Running-Cost Comparison
               </span>
@@ -1436,21 +1539,12 @@ export function PublicLandingPage() {
                         <h3 className="mt-2 font-display text-lg font-bold text-navy">
                           {p.name}
                         </h3>
-                        {p.images && p.images.length > 0 && p.images[0] ? (
-                          <img
-                            src={p.images[0]}
-                            alt={p.name}
-                            className="mt-3 mb-2 aspect-[16/10] w-full rounded-lg object-cover border border-border"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <ProductImagePlaceholder
-                            category={p.category}
-                            productName={p.name}
-                            className="mt-3 mb-2"
-                          />
-                        )}
+                        <CatalogueCardImage
+                          src={p.images?.[0]}
+                          alt={p.name}
+                          category={p.category}
+                          productName={p.name}
+                        />
                         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                           {p.description}
                         </p>
@@ -1482,6 +1576,7 @@ export function PublicLandingPage() {
                                 description: p.description,
                                 specs: p.specs as Record<string, string | number>,
                                 in_stock: p.in_stock,
+                                images: p.images,
                               },
                               6,
                               "weekly"
@@ -1504,6 +1599,7 @@ export function PublicLandingPage() {
                               description: p.description,
                               specs: p.specs as Record<string, string | number>,
                               in_stock: p.in_stock,
+                              images: p.images,
                             })
                           }
                           className={cn(
@@ -2073,7 +2169,7 @@ export function PublicLandingPage() {
                     <p className="font-bold text-action">Registration Received</p>
                     <p className="mt-1">
                       Thank you, {trainFullName}. Our training team will contact you on{" "}
-                      {trainPhone} with orientation details for {effectiveCourseTitle}.
+                      {trainPhone} with orientation details for {submittedCourseTitle || effectiveCourseTitle}.
                     </p>
                   </div>
                 ) : (
@@ -2686,9 +2782,9 @@ export function PublicLandingPage() {
 
           <div className="mt-12 grid gap-8 lg:grid-cols-[1.3fr_1fr]">
             {/* Interactive Calculator */}
-            <div className="rounded-xl border border-border bg-background p-6 md:p-8">
+            <div id="calculator" className="rounded-xl border border-border bg-background p-6 md:p-8">
               <h3 className="text-xl font-bold text-navy">
-                Instalment Cost Calculator
+                Installment Cost Calculator
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 Enter any system or equipment price to view confirmed breakdown.
@@ -2705,22 +2801,33 @@ export function PublicLandingPage() {
                   <input
                     id={`${genId}-calc-p`}
                     inputMode="numeric"
-                    value={calcPrice ? calcPrice.toLocaleString("en-NG") : ""}
-                    onChange={(e) =>
-                      setCalcPrice(
-                        Number(e.target.value.replace(/\D/g, "").slice(0, 10)) || 0
-                      )
-                    }
-                    className={cn(inputCls, "text-lg font-bold")}
+                    value={calcPriceRaw}
+                    aria-invalid={Boolean(calcError || inlinePriceError)}
+                    aria-describedby={calcError || inlinePriceError ? `${genId}-calc-error` : undefined}
+                    onChange={(e) => {
+                      setCalcError(null);
+                      setCalcPriceRaw(e.target.value);
+                    }}
+                    className={cn(inputCls, "text-lg font-bold", (calcError || inlinePriceError) && "border-destructive focus-visible:ring-destructive")}
                   />
+                  {(calcError || inlinePriceError) && (
+                    <p
+                      id={`${genId}-calc-error`}
+                      role="alert"
+                      aria-live="polite"
+                      className="text-xs font-semibold text-destructive mt-1.5"
+                    >
+                      {calcError || inlinePriceError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <fieldset>
                     <legend className="mb-1 text-xs font-semibold text-navy">
-                      Duration
+                      Payment duration
                     </legend>
-                    <div className="flex gap-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                       {[3, 6, 9, 12].map((m) => (
                         <button
                           key={m}
@@ -2733,7 +2840,7 @@ export function PublicLandingPage() {
                               : "border-input bg-background text-foreground hover:bg-accent"
                           )}
                         >
-                          {m}m
+                          {m} months
                         </button>
                       ))}
                     </div>
@@ -2782,64 +2889,115 @@ export function PublicLandingPage() {
                   <input
                     id={`${genId}-calc-dep`}
                     inputMode="numeric"
-                    value={calcDeposit ? calcDeposit.toLocaleString("en-NG") : ""}
+                    value={calcDepositRaw}
                     placeholder="0 (Zero deposit available on eligible solar plans)"
-                    onChange={(e) =>
-                      setCalcDeposit(
-                        Number(e.target.value.replace(/\D/g, "").slice(0, 10)) || 0
-                      )
-                    }
-                    className={inputCls}
+                    aria-invalid={Boolean(inlineDepositError)}
+                    aria-describedby={inlineDepositError ? `${genId}-calc-dep-error` : undefined}
+                    onChange={(e) => {
+                      setCalcError(null);
+                      setCalcDepositRaw(e.target.value);
+                    }}
+                    className={cn(inputCls, inlineDepositError && "border-destructive focus-visible:ring-destructive")}
                   />
+                  {inlineDepositError && (
+                    <p
+                      id={`${genId}-calc-dep-error`}
+                      role="alert"
+                      aria-live="polite"
+                      className="text-xs font-semibold text-destructive mt-1.5"
+                    >
+                      {inlineDepositError}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Calculated Breakdown Box */}
             <div className="flex flex-col justify-between rounded-xl bg-navy p-6 md:p-8 text-navy-foreground">
-              <div>
-                <span className="text-xs uppercase tracking-wider text-navy-muted">
-                  Calculated {calcFrequency === "weekly" ? "Weekly" : "Monthly"}{" "}
-                  Instalment
-                </span>
-                <p className="mt-2 font-display text-4xl font-extrabold text-navy-foreground sm:text-5xl">
-                  {naira(planResult.perPayment)}
-                </p>
-                <p className="mt-1 text-xs text-navy-muted">
-                  Across {planResult.payments} payments ({calcDuration} months)
-                </p>
+              {planResult ? (
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-navy-muted">
+                    Calculated {calcFrequency === "weekly" ? "Weekly" : "Monthly"}{" "}
+                    Installment
+                  </span>
+                  <p className="mt-2 font-display text-4xl font-extrabold text-navy-foreground sm:text-5xl">
+                    {naira(planResult.perPayment)}
+                  </p>
+                  <p className="mt-1 text-xs text-navy-muted">
+                    {planResult.hasDifferentFinalPayment ? (
+                      <span>
+                        {planResult.payments - 1} payments of {naira(planResult.perPayment)} + 1 final payment of {naira(planResult.finalPayment)} ({calcDuration} months)
+                      </span>
+                    ) : (
+                      <span>
+                        Across {planResult.payments} payments of {naira(planResult.perPayment)} ({calcDuration} months)
+                      </span>
+                    )}
+                  </p>
 
-                <dl className="mt-6 space-y-2 border-t border-navy-foreground/20 pt-4 text-xs sm:text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-navy-muted">Financed Principal</dt>
-                    <dd className="font-semibold">{naira(planResult.financed)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-navy-muted">Confirmed Markup</dt>
-                    <dd className="font-semibold">{planResult.markupPercent}%</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-navy-muted">Financing Charge</dt>
-                    <dd className="font-semibold">{naira(planResult.extra)}</dd>
-                  </div>
-                  <div className="flex justify-between border-t border-navy-foreground/20 pt-2 font-bold text-action-foreground text-sm">
-                    <dt>Total Repayable</dt>
-                    <dd>{naira(planResult.total)}</dd>
-                  </div>
-                </dl>
-              </div>
+                  <dl className="mt-6 space-y-2 border-t border-navy-foreground/20 pt-4 text-xs sm:text-sm">
+                    <div className="flex justify-between">
+                      <dt className="text-navy-muted">Financed Principal</dt>
+                      <dd className="font-semibold">{naira(planResult.financed)}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-navy-muted">Confirmed Markup</dt>
+                      <dd className="font-semibold">{planResult.markupPercent}%</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-navy-muted">Financing Charge</dt>
+                      <dd className="font-semibold">{naira(planResult.extra)}</dd>
+                    </div>
+                    {planResult.hasDifferentFinalPayment && (
+                      <div className="flex justify-between text-navy-muted">
+                        <dt>Adjusted Final Payment</dt>
+                        <dd className="font-semibold text-navy-foreground">{naira(planResult.finalPayment)}</dd>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-navy-foreground/20 pt-2 font-bold text-action-foreground text-sm">
+                      <dt>Total Repayable</dt>
+                      <dd>{naira(planResult.total)}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : (
+                <div role="alert" className="p-4 rounded-xl bg-navy/60 border border-navy-foreground/20 text-navy-muted text-sm space-y-2">
+                  <p className="font-bold text-action text-base">Financing Calculation Paused</p>
+                  <p className="text-xs text-navy-foreground">
+                    {inlineDepositError || inlinePriceError || "Enter a positive equipment cash price and an upfront deposit less than the cash price to calculate terms."}
+                  </p>
+                </div>
+              )}
 
               <div className="mt-8 pt-4 border-t border-navy-foreground/20">
                 <button
                   type="button"
                   onClick={() => {
+                    if (inlinePriceError || priceVal <= 0 || !Number.isFinite(priceVal)) {
+                      setCalcError("Please enter a valid positive equipment price to proceed with an application.");
+                      const inputEl = document.getElementById(`${genId}-calc-p`);
+                      inputEl?.focus();
+                      return;
+                    }
+                    if (inlineDepositError || depositVal >= priceVal) {
+                      setCalcError("Optional upfront deposit must be less than the total equipment cash price.");
+                      const depEl = document.getElementById(`${genId}-calc-dep`);
+                      depEl?.focus();
+                      return;
+                    }
+                    if (!planResult) {
+                      setCalcError("Please enter valid financing terms to proceed with an application.");
+                      return;
+                    }
+                    setCalcError(null);
                     setAppModalData({
                       productName: "Custom Equipment Financed Plan",
                       category: "solar",
-                      price: calcPrice,
+                      price: priceVal,
                       duration: calcDuration,
                       frequency: calcFrequency,
-                      deposit: calcDeposit,
+                      deposit: depositVal,
                     });
                     setAppModalOpen(true);
                   }}

@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
 
 interface ProductImagePlaceholderProps {
-  category?: string;
+  category?: string | undefined;
   productName: string;
-  className?: string;
+  className?: string | undefined;
 }
 
 export function ProductImagePlaceholder({

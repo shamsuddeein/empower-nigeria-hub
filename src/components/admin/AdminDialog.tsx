@@ -21,38 +21,70 @@ export function AdminDialog({
 }: AdminDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const wasOpenRef = useRef(false);
+
   const effectiveDescription = description ?? subtitle;
 
+  // Manage opening transition: scroll lock, save trigger element, set initial focus once
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return undefined;
+    }
 
-    // Save previously focused element to restore when closing
+    if (wasOpenRef.current) {
+      return undefined;
+    }
+
+    wasOpenRef.current = true;
     previousActiveElement.current = document.activeElement as HTMLElement | null;
 
-    // Prevent background scrolling
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Set initial focus to the dialog or first focusable element inside it
+    // Focus the first interactive field (input/select/textarea) or dialog container.
+    // Do NOT focus Close button so typing into fields is completely uninterrupted.
     const focusTimer = setTimeout(() => {
       if (dialogRef.current) {
-        const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        const firstField = dialogRef.current.querySelector<HTMLElement>(
+          'input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
         );
-        const firstFocusable = focusables[0];
-        if (firstFocusable) {
-          firstFocusable.focus();
+        if (firstField) {
+          firstField.focus();
         } else {
-          dialogRef.current.focus();
+          const focusables = Array.from(
+            dialogRef.current.querySelectorAll<HTMLElement>(
+              'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+          ).filter((el) => !el.hasAttribute("disabled") && !el.getAttribute("aria-hidden"));
+          if (focusables[0]) {
+            focusables[0].focus();
+          } else {
+            dialogRef.current.focus();
+          }
         }
       }
-    }, 50);
+    }, 40);
 
-    // Escape listener and focus trap
+    return () => {
+      clearTimeout(focusTimer);
+      document.body.style.overflow = originalOverflow;
+      if (previousActiveElement.current && typeof previousActiveElement.current.focus === "function") {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, [isOpen]);
+
+  // Keyboard navigation: Escape key to dismiss, Tab & Shift+Tab focus trap
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -87,17 +119,10 @@ export function AdminDialog({
     };
 
     window.addEventListener("keydown", handleKeyDown);
-
     return () => {
-      clearTimeout(focusTimer);
-      document.body.style.overflow = originalOverflow;
       window.removeEventListener("keydown", handleKeyDown);
-      // Restore focus to trigger
-      if (previousActiveElement.current && typeof previousActiveElement.current.focus === "function") {
-        previousActiveElement.current.focus();
-      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -106,7 +131,7 @@ export function AdminDialog({
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
+          onCloseRef.current();
         }
       }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
@@ -134,7 +159,7 @@ export function AdminDialog({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onCloseRef.current()}
             aria-label="Close dialog"
             className="min-h-[44px] min-w-[44px] -mr-2 rounded-lg flex items-center justify-center text-muted-foreground hover:text-navy hover:bg-sand/60 transition-colors focus-visible:ring-2 focus-visible:ring-navy focus-visible:outline-none"
           >

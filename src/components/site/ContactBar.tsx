@@ -8,13 +8,15 @@ import { btn } from "./ui";
 /**
  * Floating Call or WhatsApp actions.
  * Only shown when genuine contact details are configured.
- * Hidden on /apply, /admin, while a menu/dialog is open, or when #enquire is visible.
+ * Hidden on /apply, /admin, while a menu/dialog is open, when calculators/forms (#calculator, #ev-calculator, #enquire)
+ * are in view, or while inputs are focused, to prevent mobile control obstruction.
  */
 export function ContactBar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { wa, tel, hasRealPhone, hasRealWhatsApp } = useCompany();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEnquiryVisible, setIsEnquiryVisible] = useState(false);
+  const [isInteractiveSectionVisible, setIsInteractiveSectionVisible] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Hidden on /apply and /admin
   const isHiddenRoute = path.startsWith("/apply") || path.startsWith("/admin");
@@ -41,28 +43,98 @@ export function ContactBar() {
     return () => observer.disconnect();
   }, []);
 
-  // Detect when the enquiry form (#enquire) is visible in the viewport
+  // Detect focused inputs so floating buttons never cover on-screen keyboards or active inputs
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")
+      ) {
+        setIsInputFocused(true);
+      }
+    };
+    const handleFocusOut = () => {
+      setIsInputFocused(false);
+    };
+
+    window.addEventListener("focusin", handleFocusIn);
+    window.addEventListener("focusout", handleFocusOut);
+    return () => {
+      window.removeEventListener("focusin", handleFocusIn);
+      window.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
+
+  // Detect when calculators or enquiry forms are visible in the viewport to avoid obstructing inputs/actions
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const el = document.getElementById("enquire");
-    if (!el) {
-      setIsEnquiryVisible(false);
-      return;
+    const targetIds = [
+      "how-it-works",
+      "calculator",
+      "electric-vehicles",
+      "ev-calculator",
+      "enquire",
+    ];
+
+    const checkVisibility = () => {
+      const windowHeight = window.innerHeight || 800;
+      for (const id of targetIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top < windowHeight - 50 && rect.bottom > 50) {
+            setIsInteractiveSectionVisible(true);
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    // Check immediate anchor / initial load
+    if (checkVisibility()) {
+      setIsInteractiveSectionVisible(true);
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry) {
-          setIsEnquiryVisible(entry.isIntersecting);
-        }
-      },
-      { threshold: 0.1 }
-    );
+    const elements = targetIds
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => Boolean(el));
 
-    observer.observe(el);
-    return () => observer.disconnect();
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== "undefined" && elements.length > 0) {
+      const visibilityMap = new Map<Element, boolean>();
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            visibilityMap.set(entry.target, entry.isIntersecting);
+          }
+          const isAnyVisible = Array.from(visibilityMap.values()).some(Boolean);
+          setIsInteractiveSectionVisible(isAnyVisible);
+        },
+        { threshold: [0, 0.05], rootMargin: "0px 0px -40px 0px" }
+      );
+
+      elements.forEach((el) => observer?.observe(el));
+    }
+
+    const handleScrollOrNav = () => {
+      checkVisibility();
+    };
+
+    window.addEventListener("scroll", handleScrollOrNav, { passive: true });
+    window.addEventListener("hashchange", handleScrollOrNav);
+    window.addEventListener("popstate", handleScrollOrNav);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("scroll", handleScrollOrNav);
+      window.removeEventListener("hashchange", handleScrollOrNav);
+      window.removeEventListener("popstate", handleScrollOrNav);
+    };
   }, [path]);
 
   // Only show when genuine contact details exist and on valid routes
@@ -70,8 +142,8 @@ export function ContactBar() {
     return null;
   }
 
-  // Hide while menu/dialog is open or enquiry form is in view
-  if (isDialogOpen || isEnquiryVisible) {
+  // Hide while menu/dialog is open, interactive calculators/forms in view, or active typing
+  if (isDialogOpen || isInteractiveSectionVisible || isInputFocused) {
     return null;
   }
 

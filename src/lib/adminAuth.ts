@@ -1,4 +1,4 @@
-import { authClient, signIn, signOut, getSession } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 export interface AdminUser {
   id: string;
@@ -12,23 +12,27 @@ export interface AdminUser {
  * has the 'admin' role. Does not trust any client-stored identity.
  */
 export async function getCurrentAdmin(): Promise<AdminUser | null> {
-  try {
-    const res = await getSession();
-    const user = res.data?.user as (typeof res.data extends { user: infer U } ? U : any) & { role?: string };
-    if (!user || user.role !== "admin") {
-      return null;
-    }
+  const res: any = await authClient.getSession();
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: "admin",
-    };
-  } catch (err) {
-    console.error("Staff authorization check failed:", err);
+  if (res?.error) {
+    const errorMsg =
+      res.error?.message ||
+      (typeof res.error === "string" ? res.error : "Session verification service error");
+    throw new Error(errorMsg);
+  }
+
+  const user = res?.data?.user;
+
+  if (!user || user.role !== "admin") {
     return null;
   }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: "admin",
+  };
 }
 
 /**
@@ -40,7 +44,7 @@ export async function loginWithStaffCredentials(
   password: string
 ): Promise<{ user: AdminUser | null; error: string | null }> {
   try {
-    const res = await signIn.email({
+    const res = await authClient.signIn.email({
       email: email.trim(),
       password,
     });
@@ -50,11 +54,11 @@ export async function loginWithStaffCredentials(
     }
 
     // Verify session and role
-    const sessionRes = await getSession();
+    const sessionRes: any = await authClient.getSession();
     const user = sessionRes.data?.user as any;
 
     if (!user || user.role !== "admin") {
-      await signOut().catch(() => {});
+      await authClient.signOut().catch(() => {});
       return {
         user: null,
         error: "Access denied. Your account is not registered as an authorized staff administrator.",
@@ -86,7 +90,7 @@ export const loginWithSupabase = loginWithStaffCredentials;
  */
 export async function logoutAdmin(): Promise<void> {
   try {
-    await signOut();
+    await authClient.signOut();
   } catch (err) {
     console.error("Sign out error:", err);
   }

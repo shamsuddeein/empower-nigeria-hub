@@ -3,6 +3,7 @@ import { eq, desc, asc, sql, and } from "drizzle-orm";
 import { db } from "../db/index";
 import * as schema from "../db/schema";
 import { requireAdminSession } from "../auth/session";
+import { matchesEnquiryTopic, matchesProductCategory } from "../../lib/taxonomy";
 
 // ---------------------------------------------------------------------------
 // Overview Metrics
@@ -579,9 +580,6 @@ export const listAdminApplicationsFn = createServerFn({ method: "GET" })
     if (data?.status && data.status !== "all") {
       conditions.push(eq(schema.applications.status, data.status));
     }
-    if (data?.category && data.category !== "all") {
-      conditions.push(eq(schema.applications.category, data.category));
-    }
 
     let query = db.select().from(schema.applications);
     if (conditions.length === 1) {
@@ -590,7 +588,11 @@ export const listAdminApplicationsFn = createServerFn({ method: "GET" })
       query = query.where(and(...conditions)) as typeof query;
     }
 
-    const rows = await query.orderBy(desc(schema.applications.created_at));
+    let rows = await query.orderBy(desc(schema.applications.created_at));
+    if (data?.category && data.category !== "all") {
+      rows = rows.filter((r) => matchesProductCategory(r.category, data.category!));
+    }
+
     return rows.map((r) => {
       let plan = {};
       try {
@@ -1084,17 +1086,15 @@ export const listAdminMessagesFn = createServerFn({ method: "GET" })
   .validator((data?: { topic?: string }) => data)
   .handler(async ({ data }) => {
     await requireAdminSession();
-    if (data?.topic && data.topic !== "all") {
-      return await db
-        .select()
-        .from(schema.messages)
-        .where(eq(schema.messages.topic, data.topic))
-        .orderBy(desc(schema.messages.created_at));
-    }
-    return await db
+    const rows = await db
       .select()
       .from(schema.messages)
       .orderBy(desc(schema.messages.created_at));
+
+    if (data?.topic && data.topic !== "all") {
+      return rows.filter((r) => matchesEnquiryTopic(r.topic, data.topic!));
+    }
+    return rows;
   });
 
 

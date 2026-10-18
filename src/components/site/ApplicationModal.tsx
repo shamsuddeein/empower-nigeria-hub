@@ -130,13 +130,26 @@ export function ApplicationModal({
 
   if (!isOpen) return null;
 
-  const plan = calculatePlan({
-    price,
-    months: duration,
-    frequency,
-    deposit,
-    markups,
-  });
+  let plan: ReturnType<typeof calculatePlan> | null = null;
+  let planCalcError: string | null = null;
+
+  if (!Number.isFinite(price) || price <= 0) {
+    planCalcError = "Please specify a valid positive equipment price to submit an application.";
+  } else if (!Number.isFinite(deposit) || deposit < 0 || deposit >= price) {
+    planCalcError = "Upfront deposit must be non-negative and less than the total equipment cash price.";
+  } else {
+    try {
+      plan = calculatePlan({
+        price,
+        months: duration,
+        frequency,
+        deposit,
+        markups,
+      });
+    } catch (err: unknown) {
+      planCalcError = err instanceof Error ? err.message : "Error calculating installment schedule.";
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +157,21 @@ export function ApplicationModal({
     setError(null);
 
     // Client-side validation
+    if (!price || isNaN(price) || price <= 0 || !isFinite(price)) {
+      setError("Please specify a valid positive equipment price to submit an application.");
+      return;
+    }
+
+    if (deposit >= price) {
+      setError("Optional upfront deposit must be less than the total equipment cash price.");
+      return;
+    }
+
+    if (!plan) {
+      setError(planCalcError || "Invalid equipment financing terms.");
+      return;
+    }
+
     const cleanPhone = normalizeNgPhone(phone);
     if (!cleanPhone) {
       setError("Please enter a valid 11-digit Nigerian phone number (e.g. 08031234567).");
@@ -276,28 +304,30 @@ export function ApplicationModal({
                 application for <strong className="text-navy">{productName}</strong> has
                 been recorded and is awaiting staff verification.
               </p>
-              <div className="mt-4 rounded-md border border-border bg-surface p-4 text-sm">
-                <span className="block font-semibold text-navy">
-                  Proposed Plan Summary (Subject to Formal Verification):
-                </span>
-                <p className="text-muted-foreground mt-1">
-                  {plan.hasDifferentFinalPayment ? (
-                    <>
-                      {plan.payments - 1} payments of {naira(plan.perPayment)} + 1 final payment of {naira(plan.finalPayment)} ({frequency}).
-                    </>
-                  ) : (
-                    <>
-                      {naira(plan.perPayment)} every {frequency === "weekly" ? "week" : "month"}{" "}
-                      for {duration} months ({plan.payments} payments total).
-                    </>
-                  )}
-                </p>
-                {deposit > 0 && (
-                  <p className="text-xs text-navy font-medium mt-1">
-                    Upfront Deposit: {naira(deposit)} &bull; Total Repayable: {naira(plan.total)}
+              {plan && (
+                <div className="mt-4 rounded-md border border-border bg-surface p-4 text-sm">
+                  <span className="block font-semibold text-navy">
+                    Proposed Plan Summary (Subject to Formal Verification):
+                  </span>
+                  <p className="text-muted-foreground mt-1">
+                    {plan.hasDifferentFinalPayment ? (
+                      <>
+                        {plan.payments - 1} payments of {naira(plan.perPayment)} + 1 final payment of {naira(plan.finalPayment)} ({frequency}).
+                      </>
+                    ) : (
+                      <>
+                        {naira(plan.perPayment)} every {frequency === "weekly" ? "week" : "month"}{" "}
+                        for {duration} months ({plan.payments} payments total).
+                      </>
+                    )}
                   </p>
-                )}
-              </div>
+                  {deposit > 0 && (
+                    <p className="text-xs text-navy font-medium mt-1">
+                      Upfront Deposit: {naira(deposit)} &bull; Total Repayable: {naira(plan.total)}
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="mt-4 text-xs text-muted-foreground">
                 Our verification officer in Kaduna will review your business premises
                 details and contact you on <strong className="text-navy">{phone}</strong>{" "}
@@ -350,37 +380,45 @@ export function ApplicationModal({
             <div className="rounded-lg border border-border bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3 text-sm">
                 <span className="font-semibold text-navy">{productName}</span>
-                <span className="text-muted-foreground">Cash Value: {naira(price)}</span>
+                <span className="text-muted-foreground">Cash Value: {naira(price || 0)}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs sm:text-sm">
-                <div>
-                  <span className="text-muted-foreground">Tenor</span>
-                  <p className="font-bold text-navy">{duration} Months</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Frequency</span>
-                  <p className="font-bold text-navy capitalize">{frequency}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Regular Payment</span>
-                  <p className="font-display font-extrabold text-action">
-                    {naira(plan.perPayment)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Total Payable</span>
-                  <p className="font-bold text-navy">{naira(plan.total)}</p>
-                </div>
-              </div>
-              {deposit > 0 && (
-                <div className="mt-3 border-t border-border pt-2 text-xs text-navy font-medium flex justify-between">
-                  <span>Upfront Deposit Applied:</span>
-                  <span>{naira(deposit)}</span>
-                </div>
-              )}
-              {plan.hasDifferentFinalPayment && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Note: Final reconciled installment is {naira(plan.finalPayment)} ({plan.payments} payments total).
+              {plan ? (
+                <>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs sm:text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Payment duration</span>
+                      <p className="font-bold text-navy">{duration} Months</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Frequency</span>
+                      <p className="font-bold text-navy capitalize">{frequency}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Regular Payment</span>
+                      <p className="font-display font-extrabold text-action">
+                        {naira(plan.perPayment)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total Payable</span>
+                      <p className="font-bold text-navy">{naira(plan.total)}</p>
+                    </div>
+                  </div>
+                  {deposit > 0 && (
+                    <div className="mt-3 border-t border-border pt-2 text-xs text-navy font-medium flex justify-between">
+                      <span>Upfront Deposit Applied:</span>
+                      <span>{naira(deposit)}</span>
+                    </div>
+                  )}
+                  {plan.hasDifferentFinalPayment && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Note: Final reconciled installment is {naira(plan.finalPayment)} ({plan.payments} payments total).
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div role="alert" className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-semibold">
+                  {planCalcError ?? "Please specify a valid equipment cash price and deposit to calculate terms."}
                 </div>
               )}
             </div>
